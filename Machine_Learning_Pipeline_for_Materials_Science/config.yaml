@@ -1,0 +1,131 @@
+#
+# Configuration file for machine learning pipeline applied to atomic feature classification.
+#
+# Purpose:
+# This file defines dataset inputs, feature selection, ML model configurations,
+# hyperparameter tuning strategies, and output paths. It ensures reproducibility
+# and consistent experimentation across multiple materials datasets.
+#
+# Key functionalities:
+# - Specify input datasets (labeled phases and unlabeled for prediction).
+# - Define structural/physical features used in training.
+# - Configure multiple ML models (Random Forest, Histogram Gradient Boosting, SVM).
+# - Set hyperparameter search spaces and cross-validation strategies.
+# - Control reproducibility via random_state and standardized outputs.
+#
+
+#
+# --- Data and Feature Settings ---
+#
+data:
+  phase_A_csv:
+    - "data/features_5050.csv"     # CSV file with features for phase A
+  phase_A_group_id: 101            # Group identifier for phase A
+
+  phase_B_csv:
+    - "data/features_6436.csv"     # CSV file with features for phase B
+  phase_B_group_id: 123            # Group identifier for phase B
+
+  unlabeled_csv: "data/features_polyamorphous.csv"   # CSV file with unlabeled data for prediction
+
+  # Column used to group correlated atoms across datasets.
+  # Example: add a `group_id` column to each CSV so that all atoms in features_5050.csv
+  # share group_id=0 and all in features_6436.csv share group_id=1.
+  group_col: "group_id"
+
+  # Column representing the target classification label (material phase).
+  target_column: "phase_label"
+
+# List of atomic/structural features used for model training.
+# Commented-out entries are available but excluded in this configuration.
+
+# features: [R1, sqrt3_peak, sqrt4_peak, sqrt7_peak, sqrt12_peak, sqrt3_ratio, sqrt4_ratio, sqrt7_ratio, sqrt12_ratio, voronoi_volume_temporal, CN_temporal, q4, q6, neighbor_1, neighbor_2, R3_minus_R1, R4_minus_R1, R7_minus_R1, R12_minus_R1, R4_minus_R3, R7_minus_R4, R12_minus_R7, entropy, q4_divide_q6, q4_power_2, q6_power_2, R1_time_CN_temporal, R3_minus_R1_time_q4, sqrt3_ratio_divide_sqrt4_ratio, CN_time_q4, CN_time_q6, entropy_time_q4, entropy_time_q6, CN_norm_type, Voronoi_norm_type, CN_density, log_CN, log_voronoi, neighbor_1_ratio, neighbor_2_ratio]
+
+features:
+  - neighbor_1
+  - neighbor_2  
+  - R1
+  - sqrt3_ratio
+  - sqrt4_ratio
+  - sqrt7_ratio
+  - sqrt12_ratio
+  - voronoi_volume_temporal
+  - CN_temporal
+  - q4
+  - q6
+  - R3_minus_R1
+  - R4_minus_R1
+  # - R7_minus_R1
+  # - R12_minus_R1
+  # - R4_minus_R3
+  # - R7_minus_R4
+  # - R12_minus_R7
+
+
+#
+# --- Machine Learning Settings ---
+#
+ml:
+  random_state: 42          # Global random seed for reproducibility
+
+  # Fraction of groups held out for final test set.
+  # Using 0.2 ensures both groups are represented in training data.
+  test_size_groups: 0.2
+
+  # Models to train and compare
+  models:
+    RandomForest:
+      class: "sklearn.ensemble.RandomForestClassifier"
+      n_iter_search: 48
+      params:
+        n_jobs: -1
+        random_state: 42
+        class_weight: "balanced"
+      tuning_params:
+        classifier__n_estimators: [100, 200, 300, 500]
+        classifier__max_depth: [5, 10, 20, 30, 50]
+        classifier__min_samples_split: [2, 5, 10]
+
+    HistGB:
+      class: "sklearn.ensemble.HistGradientBoostingClassifier"
+      n_iter_search: 48
+      params:
+        random_state: 42
+      tuning_params:
+        classifier__max_iter: [100, 200, 300, 500, 800]
+        classifier__learning_rate: [0.1, 0.05, 0.01, 0.005]
+        classifier__max_leaf_nodes: [15, 31, 63]
+        classifier__min_samples_leaf: [10, 20, 30]
+
+    SVC:
+      class: "sklearn.svm.SVC"
+      n_iter_search: 10   # Reduced for faster tuning
+      params:
+        probability: True
+        class_weight: "balanced"
+        random_state: 42
+      tuning_params:
+        classifier__C: [0.1, 1, 10, 100, 1000]
+        classifier__kernel: ['rbf', 'linear', 'poly']
+        classifier__gamma: ['scale', 'auto', 0.1, 0.01]
+
+
+#
+# --- Hyperparameter Tuning Settings ---
+#
+tuning:
+  method: "randomized"   # RandomizedSearchCV for efficiency
+  n_iter: 48             # Max number of parameter combinations sampled
+  cv_folds: 5            # Number of CV folds during tuning
+  n_jobs: -1             # Use all available cores
+
+
+#
+# --- Output and Reproducibility Settings ---
+#
+output:
+  model_path: "outputs/models/best_pipeline.joblib"  # Final best-trained model
+  reports_dir: "outputs/reports/"                    # Evaluation reports
+  plots_dir: "outputs/plots/"                        # Figures (metrics, feature importance, etc.)
+  SHAP_Data_dir: "outputs/shap_data/"                # SHAP explanation data
+  predictions_out: "predictions.csv"                 # Predictions on unlabeled dataset

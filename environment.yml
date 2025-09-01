@@ -1,0 +1,27 @@
+name: materials-sim-ml
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy=1.26.*
+  - pandas=2.1.*
+  - scipy=1.11.*
+  - scikit-learn=1.2.*
+  - matplotlib=3.7.*
+  - pyyaml=6.0.*
+  - joblib=1.3.*
+  - shap=0.48.*
+  - pip
+  - pip:
+      - tqdm
+      - freud-analysis==3.2
+      - pyvoro==1.3.2
+
+# System packages for building C++ extensions (run first):
+# sudo apt update
+# sudo apt install build-essential
+
+# Create and activate the environment:
+# conda env create -f environment.yml
+# conda activate materials-sim-ml

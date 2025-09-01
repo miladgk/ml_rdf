@@ -1,0 +1,103 @@
+# =============================================================================
+# LAMMPS RDF Analysis and Peak Detection Configuration
+# =============================================================================
+# This configuration file defines input/output paths, analysis parameters, and
+# plotting settings for processing LAMMPS molecular dynamics trajectories.
+# It supports temporal and spatial RDF averaging, Savitzky–Golay smoothing,
+# peak detection, Gaussian fitting, and spline interpolation.
+#
+# Key functionalities:
+# - Input/output file specification for trajectory-derived RDF data.
+# - Configurable averaging workflows: temporal and spatial.
+# - Simulation box limits, RDF binning, and smoothing filters.
+# - Global and targeted peak-finding thresholds.
+# - Gaussian fitting and spline interpolation for peak refinement.
+# - Validation with tolerance checks.
+# - Multiprocessing support with worker timeouts for large-scale analysis.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Input / Output
+# -----------------------------------------------------------------------------
+radius_file: "input.txt"                         # Input file containing RDF radii
+output_csv: "outputs/output_polyamorphous.csv"            # Output CSV for per-atom results
+SNAPSHOT_DIRECTORY: "files/polyamorphous/"      # Directory with LAMMPS snapshots
+
+# -----------------------------------------------------------------------------
+# Plotting
+# -----------------------------------------------------------------------------
+PLOT_SAMPLE_ATOM_ID: 35                          # Atom ID to plot, or None to disable
+PLOT_OUTPUT_FILE: "outputs/sample_peak_finding_final_polyamorphous.png"  # Output plot file
+
+# -----------------------------------------------------------------------------
+# Analysis Workflow
+# -----------------------------------------------------------------------------
+# Selects which averaging steps to perform before peak analysis.
+# Options:
+#   - "temporal_only": Temporal averaging -> Peak Analysis
+#   - "temporal_first_spatial": Temporal avg -> First-level spatial avg -> Peak Analysis
+ANALYSIS_LEVEL: "temporal_first_spatial"
+
+# -----------------------------------------------------------------------------
+# RDF Binning and Simulation Box
+# -----------------------------------------------------------------------------
+R_MIN: 0.01                                      # Minimum RDF radius (Å)
+R_MAX: 15.0                                      # Maximum RDF radius (Å)
+NUM_BINS: 100                                    # Number of RDF bins
+
+# -----------------------------------------------------------------------------
+# Smoothing Parameters (Savitzky–Golay filter)
+# -----------------------------------------------------------------------------
+SMOOTHING_WINDOW: 11                             # Window size (odd integer)
+SMOOTHING_POLYORDER: 5                           # Polynomial order for smoothing
+
+# -----------------------------------------------------------------------------
+# Global Peak Finding Parameters
+# -----------------------------------------------------------------------------
+G_MIN_PEAK_HEIGHT: 0.2                           # Minimum allowed peak height
+G_MIN_PEAK_PROMINENCE: 0.05                      # Minimum prominence for peak detection
+G_MIN_PEAK_DISTANCE: 1                           # Minimum spacing between peaks (in bins)
+
+# -----------------------------------------------------------------------------
+# R1 Peak Identification
+# -----------------------------------------------------------------------------
+R1_MAX_SEARCH_R: 4.0                             # Maximum radius to search for R1 peak
+
+# -----------------------------------------------------------------------------
+# Targeted Second Peak Search
+# -----------------------------------------------------------------------------
+ENABLE_TARGETED_SEARCH: true                     # Enable targeted search near 2nd peak
+T_R_MIN_FACTOR: 1.5                              # Lower bound scaling relative to R1
+T_R_MAX_FACTOR: 2.2                              # Upper bound scaling relative to R1
+T_MIN_PEAK_PROMINENCE: 0.05                      # Prominence threshold for targeted peaks
+T_MIN_PEAK_DISTANCE: 4                           # Minimum spacing between targeted peaks
+
+# -----------------------------------------------------------------------------
+# Spline Interpolation
+# -----------------------------------------------------------------------------
+S_value: 2                                       # Smoothing factor (s > 0 smooths curve)
+
+# -----------------------------------------------------------------------------
+# Validation
+# -----------------------------------------------------------------------------
+ENABLE_VALIDATION: true                          # Enable peak validation
+VALIDATION_TOLERANCE: 0.5                        # Allowed tolerance for validation
+
+# -----------------------------------------------------------------------------
+# Gaussian Fitting for Peaks
+# -----------------------------------------------------------------------------
+ENABLE_GAUSSIAN_FIT: true                        # Enable Gaussian peak fitting
+FIT_PEAK_WINDOW: 0.5                             # Half-width of fitting window (Å)
+FIT_MAXFEV: 5000                                 # Maximum iterations for curve fitting
+
+# NOTE: FIT_R_MIN_FACTOR and FIT_R_MAX_FACTOR are legacy options and unused.
+# They were replaced by FIT_PEAK_WINDOW.
+# Keeping them here for backward compatibility; safe to remove if unused in code.
+FIT_R_MIN_FACTOR: 1.5
+FIT_R_MAX_FACTOR: 2.2
+
+# -----------------------------------------------------------------------------
+# Multiprocessing
+# -----------------------------------------------------------------------------
+WORKER_TIMEOUT: 300                              # Worker timeout in seconds
