@@ -21,14 +21,14 @@
 # Input / Output
 # -----------------------------------------------------------------------------
 radius_file: "input.txt"                         # Input file containing RDF radii
-output_csv: "outputs/features_polyamorphous.csv"            # Output CSV for per-atom results
-SNAPSHOT_DIRECTORY: "files/snapshots_polyamorphous/"      # Directory with LAMMPS snapshots
+output_csv: "outputs/features_4656.csv"            # Output CSV for per-atom results
+SNAPSHOT_DIRECTORY: "files/snapshots_4656/"      # Directory with LAMMPS snapshots
 
 # -----------------------------------------------------------------------------
 # Plotting
 # -----------------------------------------------------------------------------
 PLOT_SAMPLE_ATOM_ID: 35                          # Atom ID to plot, or None to disable
-PLOT_OUTPUT_FILE: "outputs/sample_peak_finding_final_polyamorphous.png"  # Output plot file
+PLOT_OUTPUT_FILE: "outputs/sample_peak_4656.png"  # Output plot file
 
 # -----------------------------------------------------------------------------
 # Analysis Workflow

@@ -1,3 +1,4 @@
+"""
 pipeline.py
 
 This module implements a full end-to-end machine learning pipeline for classification tasks 
