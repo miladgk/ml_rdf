@@ -104,8 +104,9 @@ def read_lammps_dump(dump_filename, type_radius_filename='input.txt', atomic_rad
         unique_atom_types = atom_dataframe['type'].unique()
         missing_types = [atom_type for atom_type in unique_atom_types if atom_type not in type_to_radius_map]
         if missing_types:
+            source = "config atomic_radii" if atomic_radii_override is not None else type_radius_filename
             raise ValueError(
-                f"Missing radius definitions for atom types: {missing_types} in '{type_radius_filename}'"
+                f"Missing radius definitions for atom types: {missing_types} in {source}"
             )
 
         # Map radii to atoms
