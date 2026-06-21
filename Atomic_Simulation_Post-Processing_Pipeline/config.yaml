@@ -20,9 +20,18 @@
 # -----------------------------------------------------------------------------
 # Input / Output
 # -----------------------------------------------------------------------------
-radius_file: "input.txt"                         # Input file containing RDF radii
+radius_file: "input.txt"                         # Input file containing RDF radii (fallback)
 output_csv: "outputs/features_4656.csv"            # Output CSV for per-atom results
 SNAPSHOT_DIRECTORY: "files/snapshots_4656/"      # Directory with LAMMPS snapshots
+
+# -----------------------------------------------------------------------------
+# Atomic Radii (angstrom) — used for free volume and packing fraction
+# -----------------------------------------------------------------------------
+# These override the radius_file if present. Add entries for each atom type.
+# Example for Cu-Zr binary:
+atomic_radii:
+  1: 1.28   # Cu, metallic (CN12) radius
+  2: 1.60   # Zr, metallic (CN12) radius
 
 # -----------------------------------------------------------------------------
 # Plotting

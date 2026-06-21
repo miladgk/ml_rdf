@@ -93,7 +93,8 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
         logging.info(f"Reading LAMMPS dump file: {snapshot_file}")
         try:
             df_atoms, limits = io_module.read_lammps_dump(
-                snapshot_file, params['radius_file']
+                snapshot_file, params['radius_file'],
+                atomic_radii_override=params.get('atomic_radii')
             )
         except Exception as e:
             logging.error(f"Failed to read LAMMPS dump for {snapshot_file}: {e}")

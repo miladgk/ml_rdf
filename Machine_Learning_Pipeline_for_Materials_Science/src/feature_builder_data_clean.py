@@ -156,8 +156,20 @@ def _calc_entropy_vectorized(row_vals: np.ndarray) -> np.ndarray:
 # =============================================================================
 # Main builder
 # =============================================================================
-def build_ml_table(input_csv: str, tolerance: float = 0.1) -> pd.DataFrame:
-    """Build a machine learning-ready feature table from atomic CSV input."""
+def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = None) -> pd.DataFrame:
+    """Build a machine learning-ready feature table from atomic CSV input.
+
+    Parameters
+    ----------
+    input_csv : str
+        Path to the input CSV file with per-atom data.
+    tolerance : float
+        Relative tolerance for peak matching.
+    atomic_radii : dict, optional
+        Dictionary mapping atom type to radius in angstroms.
+        E.g., {1: 1.28, 2: 1.60}. If provided, free volume and
+        packing fraction features are computed.
+    """
     df = pd.read_csv(input_csv)
 
     # Detect neighbor columns dynamically
@@ -338,15 +350,60 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1) -> pd.DataFrame:
     for col in neighbor_cols:
         ml_df[f"{col}_ratio"] = ml_df[col] / ml_df["CN_temporal"].replace(0, np.nan)
 
+    # ---------------------------------------------------------------
+    # 10. Free volume, packing fraction, and composition features
+    # ---------------------------------------------------------------
+    if atomic_radii is not None:
+        # Map atom type to radius from config dictionary
+        ml_df['atomic_radius'] = ml_df['type'].map({int(k): float(v) for k, v in atomic_radii.items()})
+        ml_df['atomic_sphere_volume'] = (4.0 / 3.0) * np.pi * (ml_df['atomic_radius'] ** 3)
+
+        # Free volume: Voronoi volume minus the atomic sphere volume
+        ml_df['free_volume_temporal'] = ml_df['voronoi_volume_temporal'] - ml_df['atomic_sphere_volume']
+
+        # Packing fraction: atomic sphere volume / Voronoi volume
+        ml_df['packing_fraction_temporal'] = ml_df['atomic_sphere_volume'] / ml_df['voronoi_volume_temporal'].replace(0, np.nan)
+
+        # Composition fraction: neighbor_1 / CN_temporal
+        cn_safe = ml_df["CN_temporal"].replace(0, np.nan)
+        ml_df['neighbor_1_fraction_temporal'] = ml_df['neighbor_1'] / cn_safe
+        if ml_df['neighbor_1_fraction_temporal'].isna().any():
+            logging.warning(f"Found {ml_df['neighbor_1_fraction_temporal'].isna().sum()} atoms with CN_temporal == 0")
+
+        # Interaction features
+        ml_df['volume_q6_interaction'] = ml_df['voronoi_volume_temporal'] * ml_df['q6']
+        ml_df['volume_per_neighbor'] = ml_df['voronoi_volume_temporal'] / cn_safe
+
+        # Add to fill_cols for per-type median imputation
+        extra_fill = ['free_volume_temporal', 'packing_fraction_temporal',
+                      'neighbor_1_fraction_temporal', 'volume_q6_interaction',
+                      'volume_per_neighbor']
+        fill_cols.extend(extra_fill)
+        ml_df[extra_fill] = ml_df.groupby("type")[extra_fill].transform(lambda x: x.fillna(x.median()))
+
     return ml_df
 
 
 # === Build and save ML table ===
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+    # Load atomic_radii from config if available
+    import yaml
+    _atomic_radii = None
+    try:
+        with open("config.yaml", "r") as f:
+            _cfg = yaml.safe_load(f)
+        _atomic_radii = _cfg.get("atomic_radii")
+        if _atomic_radii:
+            logging.info(f"Loaded atomic_radii from config: {_atomic_radii}")
+    except Exception as e:
+        logging.warning(f"Could not load atomic_radii from config: {e}")
+
     ml_df = build_ml_table(
-        "../Atomic_Simulation_Post-Processing_Pipeline/outputs/output_polyamorphous.csv",
-        tolerance=0.2
+        "../Atomic_Simulation_Post-Processing_Pipeline/outputs/features_polyamorphous.csv",
+        tolerance=0.2,
+        atomic_radii=_atomic_radii
     )
     os.makedirs("data", exist_ok=True)
     ml_df.to_csv("data/features_polyamorphous.csv", index=False)

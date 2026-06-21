@@ -22,6 +22,7 @@ Dependencies:
 - io.StringIO
 """
 
+import logging
 import pandas as pd
 from io import StringIO
 
@@ -30,7 +31,7 @@ from io import StringIO
 _RADIUS_CACHE = {}
 
 
-def read_lammps_dump(dump_filename, type_radius_filename='input.txt'):
+def read_lammps_dump(dump_filename, type_radius_filename='input.txt', atomic_radii_override=None):
     """
     Reads a LAMMPS dump file and returns a DataFrame with atom information 
     including mapped radii, along with simulation box boundaries.
@@ -43,6 +44,9 @@ def read_lammps_dump(dump_filename, type_radius_filename='input.txt'):
     type_radius_filename : str, optional
         Path to a file mapping atom types to radii (default is 'input.txt').
         The file must contain two columns: 'type' and 'radius'.
+    atomic_radii_override : dict, optional
+        Dictionary mapping atom types to radii (e.g., {1: 1.28, 2: 1.60}).
+        If provided, this takes precedence over the radius file.
 
     Returns
     -------
@@ -85,11 +89,16 @@ def read_lammps_dump(dump_filename, type_radius_filename='input.txt'):
         atom_dataframe['id'] = atom_dataframe['id'].astype(int)
 
         # Read atom type-radius mapping
-        radius_dataframe = pd.read_csv(type_radius_filename, sep=r'\s+')
-        if 'type' not in radius_dataframe.columns or 'radius' not in radius_dataframe.columns:
-            raise ValueError(f"'{type_radius_filename}' must contain columns 'type' and 'radius'")
-
-        type_to_radius_map = dict(zip(radius_dataframe['type'], radius_dataframe['radius']))
+        if atomic_radii_override is not None:
+            # Use atomic_radii from config (preferred)
+            type_to_radius_map = {int(k): float(v) for k, v in atomic_radii_override.items()}
+            logging.info(f"Using atomic_radii from config: {type_to_radius_map}")
+        else:
+            # Fallback to input.txt file
+            radius_dataframe = pd.read_csv(type_radius_filename, sep=r'\s+')
+            if 'type' not in radius_dataframe.columns or 'radius' not in radius_dataframe.columns:
+                raise ValueError(f"'{type_radius_filename}' must contain columns 'type' and 'radius'")
+            type_to_radius_map = dict(zip(radius_dataframe['type'], radius_dataframe['radius']))
 
         # Validate that all atom types have defined radii
         unique_atom_types = atom_dataframe['type'].unique()
