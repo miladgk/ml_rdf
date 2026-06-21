@@ -15,6 +15,11 @@ Key libraries:
 - SHAP: for explainability and feature contribution visualization
 - pandas, numpy: for data handling
 - matplotlib: for visualization
+
+Performance notes:
+- Permutation importance uses n_jobs=-1 for full parallelism.
+- SHAP background samples use numpy-based random state for reproducibility.
+- Preprocessor detection handles multiple naming conventions.
 """
 
 import logging
@@ -23,7 +28,7 @@ import matplotlib.pyplot as plt
 from sklearn.inspection import permutation_importance
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from typing import List
+from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -67,13 +72,12 @@ def run_permutation_importance(
         n_jobs=n_jobs
     )
 
-    # Try to extract feature names from the preprocessing step
-    feature_names = None
-    try:
-        preprocessor = trained_pipeline.named_steps.get('preproc')
-        if preprocessor and hasattr(preprocessor, "get_feature_names_out"):
-            feature_names = preprocessor.get_feature_names_out()
-    except Exception:
+    # Use raw feature names from X_test (permutation importance operates on raw input,
+    # not on transformed features). The preprocessor's get_feature_names_out() includes
+    # extra columns (e.g. MissingIndicator) which don't align with raw X_test columns.
+    if hasattr(X_test, 'columns'):
+        feature_names = list(X_test.columns)
+    else:
         feature_names = None
 
     df_importance = pd.DataFrame({
@@ -166,7 +170,7 @@ def make_stratified_background(
 def get_feature_names_from_pipeline(
     pipeline,
     fallback_names=None
-) -> List[str]:
+) -> Optional[List[str]]:
     """
     Extract feature names from a pipeline if the preprocessor supports it.
 
@@ -179,10 +183,11 @@ def get_feature_names_from_pipeline(
 
     Returns
     -------
-    list
+    list or None
         Extracted or fallback feature names.
     """
-    preprocessor = pipeline.named_steps.get('preprocessor') or pipeline.named_steps.get('preproc')
+    preprocessor = (pipeline.named_steps.get('preprocessor')
+                    or pipeline.named_steps.get('preproc'))
     if preprocessor is not None:
         try:
             return list(preprocessor.get_feature_names_out())
@@ -228,8 +233,11 @@ def run_shap_summary(
         return
 
     try:
+        from pathlib import Path
+
         # Step 1: Transform features if preprocessor exists
-        preprocessor = trained_pipeline.named_steps.get('preprocessor') or trained_pipeline.named_steps.get('preproc')
+        preprocessor = (trained_pipeline.named_steps.get('preprocessor')
+                        or trained_pipeline.named_steps.get('preproc'))
         X_raw = X_sample
         X_trans = preprocessor.transform(X_raw) if preprocessor else (
             X_raw.values if hasattr(X_raw, 'values') else X_raw
@@ -243,16 +251,18 @@ def run_shap_summary(
             )
             names = None
 
-        # Ensure DataFrame format
+        # Ensure DataFrame format (handles numpy array or sparse matrix)
         if names is not None and not isinstance(X_trans, pd.DataFrame):
-            X_trans = pd.DataFrame(X_trans, columns=names)
+            try:
+                X_trans = pd.DataFrame(X_trans, columns=list(names))
+            except Exception as e:
+                logger.warning(f"Could not create DataFrame with feature names: {e}. Using array format.")
+                names = None
 
         # Step 2: Get classifier from pipeline
-        clf = (
-            trained_pipeline.named_steps.get("clf")
-            or trained_pipeline.named_steps.get("classifier")
-            or trained_pipeline
-        )
+        clf = (trained_pipeline.named_steps.get("clf")
+               or trained_pipeline.named_steps.get("classifier")
+               or trained_pipeline)
 
         # Step 3: Choose SHAP explainer
         if "SVC" in str(type(clf)):
@@ -288,19 +298,23 @@ def run_shap_summary(
             sv = shap_values[1]
         elif hasattr(shap_values, "values") and shap_values.values.ndim == 3:
             sv = shap_values.values[:, :, 1]
-            shap_values = sv
         elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
             sv = shap_values[:, :, 1]
+        elif hasattr(shap_values, "values"):
+            # Explanation object with 2D values (e.g. binary TreeExplainer output)
+            sv = shap_values.values
         else:
             sv = shap_values
 
         # Step 4b: Save SHAP outputs
+        # Convert to numpy array if sv is still an Explanation or other non-array type
+        if hasattr(sv, "values"):
+            sv = sv.values
         if names is not None:
             shap_df = pd.DataFrame(sv, columns=names, index=getattr(X_trans, "index", None))
         else:
             shap_df = pd.DataFrame(sv, index=getattr(X_trans, "index", None))
 
-        from pathlib import Path
         output_path = Path(shap_data_dir) / "shap_values.csv"
         output_path.parent.mkdir(parents=True, exist_ok=True)
         shap_df.to_csv(output_path)

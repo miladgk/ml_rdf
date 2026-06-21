@@ -29,27 +29,26 @@ higher-level orchestration scripts such as `pipeline_orchestrator.py`.
 """
 
 import logging
-import multiprocessing
 from collections import Counter
 
 import freud
 import numpy as np
 from freud.box import Box
-from scipy.spatial import KDTree
+
 
 # Custom modules
 import io_module
 import voronoi
-from rdf import compute_local_rdf
+from rdf import compute_all_local_rdfs
 
 
 # ------------------------------------------------------------------------------
 # Logging configuration
+# NOTE: Do NOT use force=True here; pipeline_orchestrator.py handles initial logging setup.
 # ------------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    force=True
 )
 
 # Suppress verbose freud logs
@@ -121,17 +120,25 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
         pos_relative = pos - lower_bounds
         try:
             pos_wrapped = np.mod(pos_relative, box_size)
-            kd_tree = KDTree(pos_wrapped, boxsize=box_size)
         except Exception as e:
-            logging.exception(f"Failed to build KDTree for {snapshot_file}: {e}")
+            logging.exception(f"Failed to wrap positions for {snapshot_file}: {e}")
             return None
 
-        # Compute Voronoi tessellation
-        block_size = voronoi.calculate_optimal_block_size(pos, box_size)
+
+        # Compute Voronoi tessellation with optimized parameters
         try:
-            voronoi_cells = voronoi.compute_weighted_voronoi_cells(
-                pos, limits, block_size, radii
-            )
+            # Use larger block size for better performance with many atoms
+            block_size = max(5, voronoi.calculate_optimal_block_size(pos, box_size))
+            
+            # Only compute Voronoi if needed for analysis
+            if params.get('COMPUTE_VORONOI', True):
+                voronoi_cells = voronoi.compute_weighted_voronoi_cells(
+                    pos, limits, block_size, radii
+                )
+            else:
+                voronoi_cells = [{'volume': 0, 'faces': []} for _ in range(len(pos))]
+                logging.debug("Skipping Voronoi computation as configured")
+                
         except Exception as e:
             logging.error(f"Failed to compute Voronoi cells for {snapshot_file}: {e}")
             return None
@@ -159,41 +166,23 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
         }
 
         # ----------------------------------------------------------------------
-        # Compute local RDF gᵢ(r) in parallel
+        # Compute local RDF gᵢ(r) in a vectorized pass.
         # ----------------------------------------------------------------------
         logging.info(f"Computing individual g_i(r) for {snapshot_file}...")
 
-        starmap_args = [
-            (
-                i,
+        try:
+            local_rdf_results = compute_all_local_rdfs(
                 pos_wrapped,
                 ids,
-                kd_tree,
+                box_size,
                 params["R_MAX"],
                 bins_for_rdf_calc,
                 bin_volumes_for_rdf_calc,
                 density,
-                lower_bounds
             )
-            for i in range(num_atoms)
-        ]
-
-        try:
-            with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
-                rdf_results = pool.starmap(compute_local_rdf, starmap_args)
         except Exception as e:
-            logging.exception(f"RDF starmap failed for {snapshot_file}: {e}")
+            logging.exception(f"Vectorized RDF calculation failed for {snapshot_file}: {e}")
             return None
-
-        local_rdf_results = {}
-        for atom_id, g_i_r_array in rdf_results:
-            if g_i_r_array is not None:
-                local_rdf_results[atom_id] = g_i_r_array
-            else:
-                logging.warning(
-                    f"RDF calculation for atom ID {atom_id} "
-                    f"returned None in {snapshot_file}."
-                )
 
         logging.info(f"Individual g_i(r) for {snapshot_file} computed.")
 
@@ -208,14 +197,23 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
             positions, {'r_max': 3.5, 'exclude_ii': True}
         ).toNeighborList()
 
+        # Q4 and W4 (Steinhardt 2nd and 3rd order invariants, l=4)
         steinhardt_4 = freud.order.Steinhardt(l=4, average=False)
-        steinhardt_6 = freud.order.Steinhardt(l=6, average=False)
-
         steinhardt_4.compute((box, positions), neighbors=neighbor_list)
-        steinhardt_6.compute((box, positions), neighbors=neighbor_list)
-
         q4 = steinhardt_4.particle_order
+
+        wl4 = freud.order.Steinhardt(l=4, wl=True, average=False)
+        wl4.compute((box, positions), neighbors=neighbor_list)
+        w4 = wl4.particle_order
+
+        # Q6 and W6 (Steinhardt 2nd and 3rd order invariants, l=6)
+        steinhardt_6 = freud.order.Steinhardt(l=6, average=False)
+        steinhardt_6.compute((box, positions), neighbors=neighbor_list)
         q6 = steinhardt_6.particle_order
+
+        wl6 = freud.order.Steinhardt(l=6, wl=True, average=False)
+        wl6.compute((box, positions), neighbors=neighbor_list)
+        w6 = wl6.particle_order
 
         # ----------------------------------------------------------------------
         # Assemble atom-level data
@@ -239,6 +237,8 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
                     'g_i_r_snapshot': local_rdf_results[atom_id].tolist(),
                     'q4': q4[atom_index],
                     'q6': q6[atom_index],
+                    'w4': w4[atom_index],
+                    'w6': w6[atom_index],
                 })
             else:
                 logging.warning(

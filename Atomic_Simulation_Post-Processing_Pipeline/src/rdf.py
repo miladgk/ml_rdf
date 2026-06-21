@@ -26,15 +26,16 @@ This module is intended to be imported and used by snapshot-level
 processing modules (e.g., `snapshot_processor.py`) in simulation analysis pipelines.
 """
 
-import numpy as np
 import logging
-from scipy.spatial import KDTree  # Required for neighbor searches
+
+import numpy as np
+from scipy.spatial import cKDTree  # Required for neighbor searches
 
 # Configure logging
+# NOTE: Do NOT use force=True here; pipeline_orchestrator.py handles initial logging setup.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    force=True,
 )
 
 
@@ -67,6 +68,73 @@ def validate_rdf(r_values, g_r, collision_diameter=1.0, long_range_threshold=0.1
         long_range_threshold (float, optional): Threshold for long-range behavior. Defaults to 0.1.
     """
     pass
+
+
+def compute_all_local_rdfs(
+    all_positions,
+    all_atom_ids,
+    box_size,
+    cutoff,
+    bins,
+    bin_volumes,
+    density,
+):
+    """Compute local RDFs for all atoms.
+
+    Optimization:
+    - Avoid building a full (num_atoms x num_bins) float64 matrix.
+    - Accumulate per-atom bin counts into a sparse/dense-on-demand structure
+      using 1D bin index flattening and a single np.bincount pass.
+
+    Output is kept backward compatible: dict(atom_id -> np.ndarray(num_bins)).
+    """
+    all_positions = np.asarray(all_positions, dtype=float)
+    all_atom_ids = np.asarray(all_atom_ids)
+    num_atoms = len(all_atom_ids)
+    num_bins = len(bins) - 1
+
+    if num_atoms == 0:
+        return {}
+
+    try:
+        tree = cKDTree(all_positions, boxsize=box_size)
+        pairs = tree.query_pairs(cutoff, output_type='ndarray')
+
+        denominator = density * bin_volumes  # shape: (num_bins,)
+        out = {int(atom_id): np.zeros(num_bins, dtype=float) for atom_id in all_atom_ids}
+
+        if pairs.size == 0:
+            return out
+
+        # Distances between pair endpoints (minimal-image handled by cKDTree)
+        p0 = pairs[:, 0]
+        p1 = pairs[:, 1]
+        d = np.linalg.norm(all_positions[p0] - all_positions[p1], axis=1)
+
+        bin_idx = np.searchsorted(bins, d, side='right') - 1
+        bin_idx = np.clip(bin_idx, 0, num_bins - 1)
+
+        # Flattened target indices for bincount: atom_index * num_bins + bin_index
+        flat0 = p0 * num_bins + bin_idx
+        flat1 = p1 * num_bins + bin_idx
+        flat = np.concatenate([flat0, flat1])
+
+        flat_counts = np.bincount(flat, minlength=num_atoms * num_bins).astype(
+            np.float64, copy=False
+        )
+        counts = flat_counts.reshape(num_atoms, num_bins)
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            g = counts / denominator[np.newaxis, :]
+
+        for i, atom_id in enumerate(all_atom_ids):
+            out[int(atom_id)] = g[i].astype(float, copy=False)
+
+        return out
+    except Exception as error:
+        logging.error("Error computing local RDFs: %s", error, exc_info=True)
+        return {int(atom_id): np.zeros(num_bins, dtype=float) for atom_id in all_atom_ids}
+
 
 
 def compute_local_rdf(

@@ -24,15 +24,16 @@ not intended for standalone execution.
 """
 
 import logging
-from collections import defaultdict, Counter
 from types import SimpleNamespace
+
 import numpy as np
+import pandas as pd
 
 # Configure logging consistently across modules
+# NOTE: Do NOT use force=True here; pipeline_orchestrator.py handles initial logging setup.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    force=True
 )
 
 
@@ -72,135 +73,102 @@ def perform_temporal_averaging(all_snapshots_processed_data):
         "neighbor-type counts, and Steinhardt parameters across snapshots."
     )
 
-    # Initialize accumulators for averaging
-    g_i_r_accumulator = defaultdict(list)
-    volume_accumulator = defaultdict(list)
-    CN_accumulator = defaultdict(list)
-    neighbors_by_type_accumulator = defaultdict(list)
-    q4_accumulator = defaultdict(list)
-    q6_accumulator = defaultdict(list)
-    metadata_reference = {}  # Stores per-atom metadata from first encountered snapshot
-
     consolidated_metadata = None
-    all_neighbor_types = set()
+    flat_atom_records = []
 
     for snapshot_data in all_snapshots_processed_data:
         if snapshot_data is None:
             logging.warning("Skipping a snapshot as its processing returned None.")
             continue
 
-        atom_data_snapshot = snapshot_data['atom_data_snapshot']
-        snapshot_metadata = snapshot_data['snapshot_metadata']
+        atom_data_snapshot = snapshot_data.get('atom_data_snapshot', [])
+        snapshot_metadata = snapshot_data.get('snapshot_metadata', {})
 
-        # Consolidate simulation metadata from the first valid snapshot
         if consolidated_metadata is None:
             consolidated_metadata = SimpleNamespace(
-                box_size=snapshot_metadata['box_size'],
-                total_volume=snapshot_metadata['total_volume'],
-                density=snapshot_metadata['density'],
-                lower_bounds=snapshot_metadata['lower_bounds'],
-                bins=snapshot_metadata['bins'],
-                bin_volumes=snapshot_metadata['bin_volumes']
+                box_size=snapshot_metadata.get('box_size', []),
+                total_volume=snapshot_metadata.get('total_volume', 0.0),
+                density=snapshot_metadata.get('density', 0.0),
+                lower_bounds=snapshot_metadata.get('lower_bounds', []),
+                bins=snapshot_metadata.get('bins', []),
+                bin_volumes=snapshot_metadata.get('bin_volumes', [])
             )
 
-        for atom in atom_data_snapshot:
-            atom_id = atom['id']
-            all_neighbor_types.update(atom.get('neighbors_by_type', {}).keys())
+        flat_atom_records.extend(atom_data_snapshot)
 
-            # Accumulate radial distribution function
-            g_i_r_accumulator[atom_id].append(np.array(atom['g_i_r_snapshot']))
+    if not flat_atom_records:
+        logging.error("No valid snapshot data processed. Temporal averaging cannot proceed.")
+        return [], SimpleNamespace()
 
-            # Accumulate Voronoi volume if available
-            if atom['voronoi_volume'] is not None:
-                volume_accumulator[atom_id].append(atom['voronoi_volume'])
-            else:
-                logging.warning(
-                    f"Atom ID {atom_id} has no valid Voronoi volume in this snapshot."
-                )
+    atom_frame = pd.DataFrame(flat_atom_records)
+    atom_frame = atom_frame.copy()
 
-            # Accumulate coordination number if available
-            if atom['num_neighbors'] is not None:
-                CN_accumulator[atom_id].append(atom['num_neighbors'])
-            else:
-                logging.warning(f"Atom ID {atom_id} has no valid CN in this snapshot.")
+    rdf_arrays = np.asarray(
+        [np.asarray(x, dtype=float) for x in atom_frame['g_i_r_snapshot'].tolist()],
+        dtype=float,
+    )
+    atom_frame['g_i_r_snapshot'] = list(rdf_arrays)
 
-            # Accumulate neighbor-type counts
-            if atom.get('neighbors_by_type') is not None:
-                neighbors_by_type_accumulator[atom_id].append(
-                    Counter(atom['neighbors_by_type'])
-                )
+    def _mean_scalar(value):
+        arr = np.asarray(value, dtype=float)
+        return float(arr.mean()) if arr.ndim > 0 else float(arr)
 
-            # Accumulate Steinhardt parameters
-            q4_accumulator[atom_id].append(atom['q4'])
-            q6_accumulator[atom_id].append(atom['q6'])
+    q4_values = np.asarray(atom_frame['q4'].tolist(), dtype=object)
+    q6_values = np.asarray(atom_frame['q6'].tolist(), dtype=object)
+    w4_values = np.asarray(atom_frame['w4'].tolist(), dtype=object)
+    w6_values = np.asarray(atom_frame['w6'].tolist(), dtype=object)
 
-            # Store atom metadata from first snapshot
-            if atom_id not in metadata_reference:
-                metadata_reference[atom_id] = {
-                    'id': atom_id,
-                    'type': atom['type'],
-                    'x': atom['x'],
-                    'y': atom['y'],
-                    'z': atom['z'],
-                    'radius': atom['radius'],
-                }
+    q4_mean = np.vectorize(lambda value: float(np.asarray(value, dtype=float).mean()), otypes=[float])
+    q6_mean = np.vectorize(lambda value: float(np.asarray(value, dtype=float).mean()), otypes=[float])
+    w4_mean = np.vectorize(lambda value: float(np.asarray(value, dtype=float).mean()), otypes=[float])
+    w6_mean = np.vectorize(lambda value: float(np.asarray(value, dtype=float).mean()), otypes=[float])
 
-    # Compute temporal averages for q4 and q6
-    q4_avg_over_time = {atom_id: np.mean(values, axis=0) for atom_id, values in q4_accumulator.items()}
-    q6_avg_over_time = {atom_id: np.mean(values, axis=0) for atom_id, values in q6_accumulator.items()}
+    atom_frame['q4'] = q4_mean(q4_values)
+    atom_frame['q6'] = q6_mean(q6_values)
+    atom_frame['w4'] = w4_mean(w4_values)
+    atom_frame['w6'] = w6_mean(w6_values)
+
+    grouped_atoms = atom_frame.groupby('id', sort=False, observed=True)
+    q4_avg_over_time = grouped_atoms['q4'].mean().to_dict()
+    q6_avg_over_time = grouped_atoms['q6'].mean().to_dict()
+    w4_avg_over_time = grouped_atoms['w4'].mean().to_dict()
+    w6_avg_over_time = grouped_atoms['w6'].mean().to_dict()
+
+    atom_ids = atom_frame['id'].to_numpy(dtype=int)
+    unique_ids, inverse = np.unique(atom_ids, return_inverse=True)
+    rdf_sum = np.zeros((len(unique_ids), rdf_arrays.shape[1]), dtype=float)
+    np.add.at(rdf_sum, inverse, rdf_arrays)
+    rdf_counts = np.bincount(inverse).astype(float)
+    g_i_r_avg_over_time = {
+        int(atom_id): rdf_sum[idx] / rdf_counts[idx]
+        for idx, atom_id in enumerate(unique_ids)
+    }
+
+    volume_avg_over_time = grouped_atoms['voronoi_volume'].mean().to_dict()
+    CN_avg_over_time = grouped_atoms['num_neighbors'].mean().to_dict()
+
+    neighbor_records = pd.DataFrame.from_records(
+        atom_frame['neighbors_by_type'].apply(lambda x: dict(x) if isinstance(x, dict) else {}).tolist(),
+        index=atom_frame['id'],
+    ).fillna(0.0)
+
+    neighbor_avg_over_time = neighbor_records.groupby(level=0, sort=False, observed=True).mean()
+    neighbor_type_union = set(neighbor_avg_over_time.columns.tolist())
+    neighbors_by_type_avg_over_time = {
+        int(atom_id): neighbor_avg_over_time.loc[atom_id].to_dict()
+        for atom_id in neighbor_avg_over_time.index
+    }
+
+    all_neighbor_types = sorted(neighbor_type_union)
 
     if consolidated_metadata is None:
         logging.error("No valid snapshot data processed. Temporal averaging cannot proceed.")
         return [], SimpleNamespace()
 
-    # Initialize final average containers
-    g_i_r_avg_over_time = {}
-    volume_avg_over_time = {}
-    CN_avg_over_time = {}
-    neighbors_by_type_avg_over_time = {}
-
-    missing_g_i_r_atoms = []
-    missing_volume_atoms = []
-    missing_CN_atoms = []
-    missing_neighbors_by_type_atoms = []
-
-    # Average g_i(r) per atom
-    for atom_id, g_list in g_i_r_accumulator.items():
-        if g_list:
-            g_i_r_avg_over_time[atom_id] = np.mean(np.stack(g_list), axis=0)
-        else:
-            missing_g_i_r_atoms.append(atom_id)
-            logging.warning(f"Atom ID {atom_id} missing g_i(r) across all snapshots.")
-
-    # Average Voronoi volume per atom
-    for atom_id, vol_list in volume_accumulator.items():
-        if vol_list:
-            volume_avg_over_time[atom_id] = np.mean(vol_list)
-        else:
-            missing_volume_atoms.append(atom_id)
-            logging.warning(f"Atom ID {atom_id} missing volume data across all snapshots.")
-
-    # Average neighbor-type counts per atom
-    for atom_id, counters_list in neighbors_by_type_accumulator.items():
-        if counters_list:
-            summed_counts = Counter()
-            for counter in counters_list:
-                summed_counts.update(counter)
-            neighbors_by_type_avg_over_time[atom_id] = {
-                neighbor_type: summed_counts[neighbor_type] / len(counters_list)
-                for neighbor_type in summed_counts
-            }
-        else:
-            missing_neighbors_by_type_atoms.append(atom_id)
-            logging.warning(f"Atom ID {atom_id} missing neighbors_by_type data across snapshots.")
-
-    # Average coordination number per atom
-    for atom_id, CN_list in CN_accumulator.items():
-        if CN_list:
-            CN_avg_over_time[atom_id] = np.mean(CN_list)
-        else:
-            missing_CN_atoms.append(atom_id)
-            logging.warning(f"Atom ID {atom_id} missing CN data across all snapshots.")
+    missing_g_i_r_atoms = [atom_id for atom_id in g_i_r_avg_over_time if not np.isfinite(g_i_r_avg_over_time[atom_id]).all()]
+    missing_volume_atoms = [atom_id for atom_id in volume_avg_over_time if pd.isna(volume_avg_over_time[atom_id])]
+    missing_CN_atoms = [atom_id for atom_id in CN_avg_over_time if pd.isna(CN_avg_over_time[atom_id])]
+    missing_neighbors_by_type_atoms = [atom_id for atom_id in neighbors_by_type_avg_over_time if not neighbors_by_type_avg_over_time[atom_id]]
 
     # Log summary of missing data
     if missing_g_i_r_atoms:
@@ -214,7 +182,18 @@ def perform_temporal_averaging(all_snapshots_processed_data):
 
     logging.info("Temporal averaging complete. Constructing final atom data list.")
 
-    # Construct final list of atoms with averaged data
+    metadata_reference = {
+        int(atom['id']): {
+            'id': int(atom['id']),
+            'type': atom['type'],
+            'x': atom['x'],
+            'y': atom['y'],
+            'z': atom['z'],
+            'radius': atom['radius'],
+        }
+        for atom in flat_atom_records
+    }
+
     final_atom_data_list = []
     for atom_id, metadata in metadata_reference.items():
         if atom_id in g_i_r_avg_over_time and atom_id in volume_avg_over_time and atom_id in CN_avg_over_time:
@@ -228,6 +207,8 @@ def perform_temporal_averaging(all_snapshots_processed_data):
             averaged_entry['CN_temporal'] = CN_avg_over_time[atom_id]
             averaged_entry['q4_temporal'] = q4_avg_over_time.get(atom_id, np.nan)
             averaged_entry['q6_temporal'] = q6_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['w4_temporal'] = w4_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['w6_temporal'] = w6_avg_over_time.get(atom_id, np.nan)
             final_atom_data_list.append(averaged_entry)
         else:
             logging.warning(

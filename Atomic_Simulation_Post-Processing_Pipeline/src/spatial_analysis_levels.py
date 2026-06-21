@@ -2,129 +2,156 @@
 spatial_analysis_levels.py
 --------------------------
 
-This module performs a **temporal + first-level spatial analysis** of radial distribution functions (RDFs) 
-for atomic systems, followed by peak detection to extract structural metrics. It is designed for use in 
-materials science and computational chemistry workflows, where structural information about disordered 
-systems (e.g., metallic glasses, liquids) is needed.
-
-Workflow:
-1. Each atom’s time-averaged RDF is retrieved.
-2. A first-level spatial average is computed by combining the central atom’s RDF with those of its Voronoi neighbors.
-3. Automated peak detection is performed on the spatially averaged RDF to extract structural features.
-4. Results are packaged into dictionaries for downstream processing or export.
-
-Key Features:
-- Efficient atom lookup via an ID-indexed map for fast neighbor retrieval.
-- Handles cases where atoms have no Voronoi neighbors.
-- Converts NumPy arrays to Python lists for safe JSON/CSV serialization.
-- Uses external `peak_analysis` module for automated RDF peak detection.
-
-Dependencies:
-- **pandas** and **NumPy** for numerical operations.
-- **logging** for diagnostics and tracking.
-- **peak_analysis** (custom module) for structural feature extraction.
-
-Intended Use:
-This module integrates into larger simulation post-processing pipelines, 
-particularly for workflows analyzing atomic structure using RDFs and Voronoi tessellations.
+This module performs a **temporal + first-level spatial analysis** of radial distribution
+functions (RDFs) for atomic systems, followed by peak detection to extract structural
+metrics.
 """
 
-import numpy as np
+import json
 import logging
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
-# Custom Modules
+
+import numpy as np
+
 import peak_analysis
 
 
 def perform_temporal_first_spatial_analysis(initial_atom_data_list, r_values_bin_centers, params):
     """
-    Perform first-level spatial averaging on time-averaged RDFs for each atom, 
-    followed by peak analysis.
-
-    Parameters
-    ----------
-    initial_atom_data_list : list of dict
-        List of per-atom dictionaries containing at least:
-        - 'id' (int): Atom identifier.
-        - 'type' (int or str): Atom type/classification.
-        - 'g_i_r_temporal_avg' (np.ndarray): Time-averaged RDF values for the atom.
-        - 'vor_neighbors' (list[int], optional): IDs of Voronoi neighbors.
-    r_values_bin_centers : np.ndarray
-        Array of RDF bin center values corresponding to RDF values.
-    params : dict
-        Dictionary of configuration/analysis parameters for peak detection.
-
-    Returns
-    -------
-    list of dict
-        A list of dictionaries containing:
-        - Original atom data.
-        - First-level spatially averaged RDF (used for peak analysis).
-        - Peak analysis results.
-        Arrays are converted to lists for JSON/CSV serialization compatibility.
+    Perform first-level spatial averaging on time-averaged RDFs, followed by peak analysis.
     """
     logging.info("Performing first-level spatial averaging on time-averaged RDFs.")
+    num_bins = params.get("NUM_BINS", 100)
+    r_values = np.asarray(r_values_bin_centers, dtype=float)
+
+    # Step 1: Pre-convert all RDFs to a 2D numpy array
+    num_atoms = len(initial_atom_data_list)
+    rdf_matrix = np.empty((num_atoms, num_bins), dtype=np.float64)
+    atom_ids = np.empty(num_atoms, dtype=np.int64)
+    base_metadata = []
+
+    for i, atom_data in enumerate(initial_atom_data_list):
+        raw_rdf = atom_data['g_i_r_temporal_avg']
+        if isinstance(raw_rdf, str):
+            rdf_arr = np.array(json.loads(raw_rdf), dtype=np.float64)
+        elif isinstance(raw_rdf, (list, np.ndarray)):
+            rdf_arr = np.asarray(raw_rdf, dtype=np.float64)
+        else:
+            rdf_arr = np.zeros(num_bins, dtype=np.float64)
+
+        rdf_matrix[i] = rdf_arr
+        atom_ids[i] = int(atom_data['id'])
+        base_metadata.append({
+            'id': int(atom_data['id']),
+            'type': atom_data.get('type'),
+            'x': atom_data.get('x'),
+            'y': atom_data.get('y'),
+            'z': atom_data.get('z'),
+            'radius': atom_data.get('radius'),
+            'voronoi_volume_temporal': atom_data.get('voronoi_volume_temporal'),
+            'CN_temporal': atom_data.get('CN_temporal'),
+            'neighbors_by_type_temporal': atom_data.get('neighbors_by_type_temporal'),
+            'q4_temporal': atom_data.get('q4_temporal'),
+            'q6_temporal': atom_data.get('q6_temporal'),
+        })
+
+    # Build id -> index lookup
+    id_to_idx = {int(atom_ids[i]): i for i in range(num_atoms)}
+
+    # Step 2: Spatial averaging
+    spatially_avg_rdf_matrix = np.empty_like(rdf_matrix)
+    for i, atom_data in enumerate(initial_atom_data_list):
+        central_rdf = rdf_matrix[i]
+        neighbor_ids_raw = atom_data.get('vor_neighbors', [])
+        valid_neighbor_indices = [
+            id_to_idx[int(nid)] for nid in neighbor_ids_raw if int(nid) in id_to_idx
+        ]
+        if valid_neighbor_indices:
+            neighbor_sum = rdf_matrix[valid_neighbor_indices].sum(axis=0)
+            spatially_avg_rdf_matrix[i] = (central_rdf + neighbor_sum) / (1 + len(valid_neighbor_indices))
+        else:
+            spatially_avg_rdf_matrix[i] = central_rdf
+
+    del rdf_matrix
+
+    # Step 3: Parallel peak analysis
+    max_workers = params.get('MAX_WORKERS_SPATIAL', None)
+    if max_workers is None:
+        import multiprocessing
+        max_workers = max(1, multiprocessing.cpu_count() - 1)
+
+    chunk_size = max(1, min(256, num_atoms // (max_workers * 4)))
+    r_values_list = r_values.tolist()
+    sample_atom_id = params.get('PLOT_SAMPLE_ATOM_ID', None)
+
+    main_process_ids = set()
+    if sample_atom_id is not None:
+        main_process_ids.add(int(sample_atom_id))
+
+    worker_chunks = []
+    main_process_batch = []
+
+    for i, atom_id in enumerate(atom_ids):
+        aid = int(atom_id)
+        worker_payload = (
+            aid,
+            spatially_avg_rdf_matrix[i].tolist(),
+            r_values_list,
+            params,
+        )
+        if aid in main_process_ids:
+            main_process_batch.append(worker_payload)
+        else:
+            worker_chunks.append(worker_payload)
+
     final_processed_atom_results = []
 
-    # Map atom data by ID for efficient O(1) neighbor lookups
-    atom_data_map = {atom['id']: atom for atom in initial_atom_data_list}
+    if main_process_batch:
+        logging.info(f"Processing sample atom {sample_atom_id} in main process.")
+        for payload in main_process_batch:
+            result = _analyze_one_atom(payload)
+            final_processed_atom_results.append(result)
 
-    for atom_data in initial_atom_data_list:
-        atom_id = atom_data['id']
-        atom_type = atom_data['type']
+    if worker_chunks:
+        chunked = [worker_chunks[i:i + chunk_size] for i in range(0, len(worker_chunks), chunk_size)]
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(_process_chunk, chunk) for chunk in chunked]
+            for future in as_completed(futures):
+                try:
+                    chunk_results = future.result(timeout=params.get('SPATIAL_TIMEOUT', 600))
+                    final_processed_atom_results.extend(chunk_results)
+                except Exception as exc:
+                    logging.error(f"Spatial analysis chunk failed: {exc}", exc_info=True)
 
-        # Retrieve the central atom's temporal RDF
-        central_rdf = atom_data['g_i_r_temporal_avg']
+    logging.info(f"Completed temporal-first-spatial analysis for {len(final_processed_atom_results)} atoms.")
 
-        # Initialize neighbor RDF sum
-        neighbor_rdf_sum = np.zeros_like(central_rdf, dtype=float)
-        neighbor_ids = atom_data.get('vor_neighbors', [])
-        num_neighbors = len(neighbor_ids)
-
-        if num_neighbors > 0:
-            for neighbor_id in neighbor_ids:
-                neighbor_data = atom_data_map.get(neighbor_id)
-                if neighbor_data:
-                    neighbor_rdf_sum += neighbor_data['g_i_r_temporal_avg']
-                else:
-                    logging.warning(
-                        f"Neighbor ID {neighbor_id} for atom {atom_id} not found in the data map."
-                    )
-
-            # Compute first-level spatial average RDF
-            # Formula: g_i^first(r) = (g_i^temporal(r) + Σ g_j^temporal(r)) / (1 + N_i)
-            first_avg_rdf = (central_rdf + neighbor_rdf_sum) / (1 + num_neighbors)
-        else:
-            # If atom has no neighbors, use its temporal RDF as the spatial average
-            first_avg_rdf = central_rdf
-            logging.debug(
-                f"Atom {atom_id} has no neighbors. Using its temporal average as its spatial average."
-            )
-
-        # Perform peak analysis on the spatially averaged RDF
-        logging.debug(
-            f"Starting peak analysis for atom {atom_id} (type {atom_type}) on spatially-averaged RDF."
+    # Step 4: Restore metadata
+    base_metadata_map = {m['id']: m for m in base_metadata}
+    full_results = []
+    for result in final_processed_atom_results:
+        atom_id = result['id']
+        meta = dict(base_metadata_map.get(atom_id, {}))
+        meta.update(result)
+        meta['g_i_r_temporal_avg'] = json.dumps(
+            np.around(meta.get('g_i_r_temporal_avg', np.zeros(num_bins)), 4).tolist()
         )
-        peak_results = peak_analysis.analyze_rdf_peaks(
-            r_values_bins=r_values_bin_centers,
-            rdf_data_array=first_avg_rdf,
-            analysis_parameters=params,
-            atom_id=atom_id
-        )
+        full_results.append(meta)
 
-        # Combine results into a single dictionary
-        result_entry = {
-            **atom_data,
-            **peak_results,
-        }
+    return full_results
 
-        # Convert NumPy arrays to lists for serialization compatibility
-        if isinstance(result_entry['g_i_r_temporal_avg'], np.ndarray):
-            result_entry['g_i_r_temporal_avg'] = result_entry['g_i_r_temporal_avg'].tolist()
 
-        final_processed_atom_results.append(result_entry)
+def _analyze_one_atom(worker_payload):
+    """Run peak analysis for a single atom."""
+    atom_id, rdf_list, r_values_list, params = worker_payload
+    rdf_array = np.array(rdf_list, dtype=float)
+    r_values = np.array(r_values_list, dtype=float)
+    g_i_r = {"id": atom_id, "g_i_r_temporal_avg": rdf_array.tolist()}
+    result = peak_analysis.process_atom_rdf(r_values, g_i_r, params)
+    result['id'] = atom_id
+    return result
 
-    logging.info(
-        f"Completed temporal-first-spatial analysis for {len(final_processed_atom_results)} atoms."
-    )
-    return final_processed_atom_results
+
+def _process_chunk(chunk_args):
+    """Process a chunk of atoms in one worker process."""
+    return [_analyze_one_atom(args) for args in chunk_args]

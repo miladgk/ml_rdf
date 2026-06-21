@@ -1,0 +1,8 @@
+2026-06-11 14:03:32,117 [INFO] Using SciPy's fftpack for FFTs
+2026-06-11 14:03:32,149 [INFO] Starting structural analysis pipeline.
+2026-06-11 14:03:32,157 [INFO] Configuration loaded successfully.
+2026-06-11 14:03:32,158 [INFO] Analysis level set to: temporal_first_spatial
+2026-06-11 14:03:32,161 [INFO] Found 1 snapshot files.
+2026-06-11 14:03:32,161 [INFO] Processing 1 snapshots in parallel to extract per-atom g_i(r) and Voronoi data.
+2026-06-11 14:03:32,730 [INFO] Using SciPy's fftpack for FFTs
+2026-06-11 14:03:32,751 [INFO] Reading LAMMPS dump file: /mnt/d/Projects/Amorphous_RDF/GitHub/Atomic_Simulation_Post-Processing_Pipeline/files/polyamorphous/combined_final_dump.lammpstrj

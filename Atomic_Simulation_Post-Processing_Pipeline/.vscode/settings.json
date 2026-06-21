@@ -1,0 +1,8 @@
+{
+    "python.defaultInterpreterPath": "/home/milad/miniconda3/envs/materials-sim-ml/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "python.analysis.extraPaths": [
+        "/home/milad/miniconda3/envs/materials-sim-ml/lib/python3.10/site-packages"
+    ]
+}

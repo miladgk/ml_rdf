@@ -1,0 +1,30 @@
+2026-06-13 20:24:26,252 [INFO] Using SciPy's fftpack for FFTs
+2026-06-13 20:24:26,279 [INFO] Starting structural analysis pipeline.
+2026-06-13 20:24:26,287 [INFO] Configuration loaded successfully.
+2026-06-13 20:24:26,289 [INFO] Analysis level set to: temporal_first_spatial
+2026-06-13 20:24:26,292 [INFO] Found 1 snapshot files.
+2026-06-13 20:24:26,293 [INFO] Processing 1 snapshots in parallel to extract per-atom g_i(r) and Voronoi data.
+2026-06-13 20:24:26,293 [INFO] Processing single snapshot in main process.
+2026-06-13 20:24:26,293 [INFO] Reading LAMMPS dump file: /mnt/d/Projects/Amorphous_RDF/GitHub/Atomic_Simulation_Post-Processing_Pipeline/files/snapshots_polyamorphous/combined_final_dump.lammpstrj
+2026-06-13 20:24:28,915 [INFO] Computing individual g_i(r) for /mnt/d/Projects/Amorphous_RDF/GitHub/Atomic_Simulation_Post-Processing_Pipeline/files/snapshots_polyamorphous/combined_final_dump.lammpstrj...
+2026-06-13 20:24:30,337 [INFO] Individual g_i(r) for /mnt/d/Projects/Amorphous_RDF/GitHub/Atomic_Simulation_Post-Processing_Pipeline/files/snapshots_polyamorphous/combined_final_dump.lammpstrj computed.
+2026-06-13 20:24:31,137 [INFO] Performing temporal averaging of g_i(r) and Voronoi volume.
+2026-06-13 20:24:31,137 [INFO] Starting temporal averaging of g_i(r), Voronoi volume, CN, neighbor-type counts, and Steinhardt parameters across snapshots.
+2026-06-13 20:24:32,800 [INFO] Temporal averaging complete. Constructing final atom data list.
+2026-06-13 20:24:32,930 [INFO] Temporal averaging produced data for 36828 atoms.
+2026-06-13 20:24:32,949 [INFO] Performing first-level spatial averaging and peak analysis.
+2026-06-13 20:24:32,949 [INFO] Performing first-level spatial averaging on time-averaged RDFs.
+2026-06-13 20:24:33,495 [INFO] Processing sample atom 35 in main process.
+2026-06-13 20:24:33,774 [INFO] Plotting results for sample Atom ID: 35
+2026-06-13 20:24:34,025 [INFO] Sample plot saved to outputs/sample_peak_finding_final_polyamorphous.png
+2026-06-13 20:24:35,051 [INFO] Using SciPy's fftpack for FFTs
+2026-06-13 20:24:35,071 [INFO] Using SciPy's fftpack for FFTs
+2026-06-13 20:24:35,080 [INFO] Using SciPy's fftpack for FFTs
+2026-06-13 20:24:35,093 [INFO] Using SciPy's fftpack for FFTs
+2026-06-13 20:24:35,165 [INFO] Using SciPy's fftpack for FFTs
+2026-06-13 20:24:35,201 [INFO] Using SciPy's fftpack for FFTs
+2026-06-13 20:24:35,202 [INFO] Using SciPy's fftpack for FFTs
+2026-06-13 20:25:42,796 [INFO] Completed temporal-first-spatial analysis for 36828 atoms.
+2026-06-13 20:25:46,389 [INFO] Creating final DataFrame and exporting results to CSV.
+2026-06-13 20:25:49,844 [INFO] Final results saved to outputs/features_polyamorphous.csv
+2026-06-13 20:25:49,918 [INFO] Total pipeline execution time: 83.64 seconds

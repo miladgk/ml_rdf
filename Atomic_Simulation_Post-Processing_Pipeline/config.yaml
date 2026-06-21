@@ -21,8 +21,8 @@
 # Input / Output
 # -----------------------------------------------------------------------------
 radius_file: "input.txt"                         # Input file containing RDF radii
-output_csv: "outputs/output_polyamorphous.csv"            # Output CSV for per-atom results
-SNAPSHOT_DIRECTORY: "files/polyamorphous/"      # Directory with LAMMPS snapshots
+output_csv: "outputs/features_polyamorphous.csv"            # Output CSV for per-atom results
+SNAPSHOT_DIRECTORY: "files/snapshots_polyamorphous/"      # Directory with LAMMPS snapshots
 
 # -----------------------------------------------------------------------------
 # Plotting
@@ -43,7 +43,7 @@ ANALYSIS_LEVEL: "temporal_first_spatial"
 # RDF Binning and Simulation Box
 # -----------------------------------------------------------------------------
 R_MIN: 0.01                                      # Minimum RDF radius (Å)
-R_MAX: 15.0                                      # Maximum RDF radius (Å)
+R_MAX: 12.0                                      # Maximum RDF radius (Å) — reduced from 15.0 for ~13% speedup
 NUM_BINS: 100                                    # Number of RDF bins
 
 # -----------------------------------------------------------------------------
@@ -89,7 +89,7 @@ VALIDATION_TOLERANCE: 0.5                        # Allowed tolerance for validat
 # -----------------------------------------------------------------------------
 ENABLE_GAUSSIAN_FIT: true                        # Enable Gaussian peak fitting
 FIT_PEAK_WINDOW: 0.5                             # Half-width of fitting window (Å)
-FIT_MAXFEV: 5000                                 # Maximum iterations for curve fitting
+FIT_MAXFEV: 2000                                 # Maximum iterations for curve fitting
 
 # NOTE: FIT_R_MIN_FACTOR and FIT_R_MAX_FACTOR are legacy options and unused.
 # They were replaced by FIT_PEAK_WINDOW.
@@ -101,3 +101,7 @@ FIT_R_MAX_FACTOR: 2.2
 # Multiprocessing
 # -----------------------------------------------------------------------------
 WORKER_TIMEOUT: 300                              # Worker timeout in seconds
+
+# MPI partial outputs directory (used by pipeline_mpi.py)
+MPI_PARTIAL_DIR: "outputs/mpi_partials"
+

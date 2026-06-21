@@ -26,10 +26,15 @@ import pandas as pd
 from io import StringIO
 
 
+# Cache for radius mappings to avoid repeated file reads
+_RADIUS_CACHE = {}
+
+
 def read_lammps_dump(dump_filename, type_radius_filename='input.txt'):
     """
     Reads a LAMMPS dump file and returns a DataFrame with atom information 
     including mapped radii, along with simulation box boundaries.
+    Optimized with radius mapping caching and efficient file reading.
 
     Parameters
     ----------
@@ -53,11 +58,13 @@ def read_lammps_dump(dump_filename, type_radius_filename='input.txt'):
     ValueError
         If the dump file or radius mapping file is malformed or inconsistent.
     """
+    # Read file in one operation for efficiency
     try:
         with open(dump_filename, 'r') as dump_file:
             file_lines = dump_file.readlines()
     except Exception as e:
         raise IOError(f"Error reading file '{dump_filename}': {e}")
+
 
     try:
         # Extract simulation box boundaries

@@ -59,11 +59,12 @@ from scipy.interpolate import UnivariateSpline
 from scipy.optimize import curve_fit
 from scipy.signal import find_peaks, savgol_filter
 
+
 # Configure logging
+# NOTE: Do NOT use force=True here; pipeline_orchestrator.py handles initial logging setup.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    force=True,
 )
 
 # Expected Ratios for validation (relative to R1)
@@ -133,42 +134,13 @@ def calculate_r_values(bins: np.ndarray) -> np.ndarray:
 def gaussian(x: np.ndarray, height: float, center: float, width: float) -> np.ndarray:
     """
     Single Gaussian function.
-
-    Args:
-        x (np.ndarray): Input coordinates.
-        height (float): Gaussian amplitude.
-        center (float): Mean (center) of the Gaussian.
-        width (float): Standard deviation-like width parameter.
-
-    Returns:
-        np.ndarray: Gaussian values at x.
     """
     return height * np.exp(-((x - center) ** 2) / (2 * width ** 2))
 
 
-def double_gaussian(
-    x: np.ndarray,
-    h1: float,
-    c1: float,
-    w1: float,
-    h2: float,
-    c2: float,
-    w2: float,
-) -> np.ndarray:
+def double_gaussian(x, h1, c1, w1, h2, c2, w2):
     """
     Sum of two Gaussian functions.
-
-    Args:
-        x (np.ndarray): Input coordinates.
-        h1 (float): Height of first Gaussian.
-        c1 (float): Center of first Gaussian.
-        w1 (float): Width of first Gaussian.
-        h2 (float): Height of second Gaussian.
-        c2 (float): Center of second Gaussian.
-        w2 (float): Width of second Gaussian.
-
-    Returns:
-        np.ndarray: Sum of Gaussian values at x.
     """
     return gaussian(x, h1, c1, w1) + gaussian(x, h2, c2, w2)
 
@@ -278,7 +250,7 @@ class GaussianFitter:
                 y_data,
                 p0=p0,
                 bounds=(lower_bounds, upper_bounds),
-                maxfev=self.params["FIT_MAXFEV"],
+                maxfev=min(self.params.get("FIT_MAXFEV", 5000), 2000),
             )
             h1, c1, w1, h2, c2, w2 = popt
             # Enforce c1 < c2 (ordering)
@@ -290,14 +262,19 @@ class GaussianFitter:
             ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
             r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else np.nan
 
+            # FWHM = 2 * sqrt(2 * ln(2)) * sigma ≈ 2.3548 * sigma
+            fwhm1 = 2.3548 * abs(w1)
+            fwhm2 = 2.3548 * abs(w2)
             return {
                 "fit_success": True,
                 "fit_h1": h1,
                 "fit_c1": c1,
                 "fit_w1": w1,
+                "fit_fwhm1": fwhm1,
                 "fit_h2": h2,
                 "fit_c2": c2,
                 "fit_w2": w2,
+                "fit_fwhm2": fwhm2,
                 "fit_r2": r_squared,
             }
 
@@ -809,18 +786,11 @@ def process_atom_rdf(r_values: np.ndarray, g_i_r: dict, params: dict) -> dict:
         np.around(targeted_h, 4).tolist()
     )
 
-    # Spline interpolation to increase resolution for fitting
-    spline = UnivariateSpline(r_values, smoothed_rdf, s=params["S_value"])
-    r_interp = np.linspace(r_values[0], r_values[-1], 5 * len(r_values))
-    rdf_interp = spline(r_interp)
-
-    # Double Gaussian fitting
-    if params["ENABLE_GAUSSIAN_FIT"] and not np.isnan(r1_val):
-        # Note: The original used interpolated values for fitting
-        fitter = GaussianFitter(params, r1_val, r_interp, rdf_interp)
+    # Double Gaussian fitting — fit directly on smoothed RDF, skip expensive spline
+    fit_results = {"fit_success": False}
+    if params.get("ENABLE_GAUSSIAN_FIT", False) and not np.isnan(r1_val):
+        fitter = GaussianFitter(params, r1_val, r_values, smoothed_rdf)
         fit_results = fitter.fit()
-    else:
-        fit_results = {"fit_success": False}
     results.update(fit_results)
 
     # Optional plotting for a sample atom
@@ -1025,22 +995,5 @@ def analyze_rdf_peaks(
     return result
 
 
-# NOTE: The following block mirrors the original script exactly, including
-# references to variables that are not defined in this file's global scope.
-# This preserves the original behavior and structure without altering logic.
-if __name__ == "__main__" and params["PLOT_SAMPLE_ATOM_ID"] == atom_id:  # noqa: F821
-    plot_peak_results(  # noqa: F821
-        r_values,  # noqa: F821
-        original_rdf,  # noqa: F821
-        smoothed_rdf,  # noqa: F821
-        global_peaks_r,  # noqa: F821
-        global_peaks_h,  # noqa: F821
-        targeted_peaks_r,  # noqa: F821
-        targeted_peaks_h,  # noqa: F821
-        r1_val,  # noqa: F821
-        validation_results,  # noqa: F821
-        fit_results,  # noqa: F821
-        params,  # noqa: F821
-        atom_id,  # noqa: F821
-    )
-    run_analysis()  # noqa: F821
+# NOTE: This file is meant to be imported, not run directly.
+# The standalone analysis pipeline is accessible via `run_analysis()`.
