@@ -54,6 +54,8 @@ def perform_temporal_first_spatial_analysis(initial_atom_data_list, r_values_bin
             'neighbors_by_type_temporal': atom_data.get('neighbors_by_type_temporal'),
             'q4_temporal': atom_data.get('q4_temporal'),
             'q6_temporal': atom_data.get('q6_temporal'),
+            'q4_avg_temporal': atom_data.get('q4_avg_temporal'),
+            'q6_avg_temporal': atom_data.get('q6_avg_temporal'),
         })
 
     # Build id -> index lookup
