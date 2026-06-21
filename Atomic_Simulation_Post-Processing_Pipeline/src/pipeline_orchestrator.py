@@ -268,7 +268,12 @@ def run_pipeline(config_path: str | None = None) -> None:
         if not os.path.isabs(sd):
             params['SNAPSHOT_DIRECTORY'] = os.path.normpath(os.path.join(params_resolve_dir, sd))
 
-    os.makedirs("outputs", exist_ok=True)
+    if 'output_csv' in params and isinstance(params['output_csv'], str):
+        oc = params['output_csv']
+        if not os.path.isabs(oc):
+            params['output_csv'] = os.path.normpath(os.path.join(params_resolve_dir, oc))
+
+    os.makedirs(os.path.dirname(params.get('output_csv', 'outputs/')), exist_ok=True)
 
     bins_for_rdf_calc = rdf.create_adaptive_bins(params["R_MIN"], params["R_MAX"], params["NUM_BINS"])
     bin_volumes_for_rdf_calc = 4 / 3 * np.pi * (bins_for_rdf_calc[1:]**3 - bins_for_rdf_calc[:-1]**3)
