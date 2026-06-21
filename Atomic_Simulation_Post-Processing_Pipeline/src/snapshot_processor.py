@@ -215,6 +215,15 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
         wl6.compute((box, positions), neighbors=neighbor_list)
         w6 = wl6.particle_order
 
+        # Q4_avg and Q6_avg (Lechner-Dellago averaged, l=4 and l=6)
+        steinhardt_4_avg = freud.order.Steinhardt(l=4, average=True)
+        steinhardt_4_avg.compute((box, positions), neighbors=neighbor_list)
+        q4_avg = steinhardt_4_avg.particle_order
+
+        steinhardt_6_avg = freud.order.Steinhardt(l=6, average=True)
+        steinhardt_6_avg.compute((box, positions), neighbors=neighbor_list)
+        q6_avg = steinhardt_6_avg.particle_order
+
         # ----------------------------------------------------------------------
         # Assemble atom-level data
         # ----------------------------------------------------------------------
@@ -239,6 +248,8 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
                     'q6': q6[atom_index],
                     'w4': w4[atom_index],
                     'w6': w6[atom_index],
+                    'q4_avg': q4_avg[atom_index],
+                    'q6_avg': q6_avg[atom_index],
                 })
             else:
                 logging.warning(

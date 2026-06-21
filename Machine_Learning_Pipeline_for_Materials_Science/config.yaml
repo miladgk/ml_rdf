@@ -25,6 +25,8 @@ features:
   - q6
   - w4
   - w6
+  - q4_avg
+  - q6_avg
   - gaussian_peak2_center
   - gaussian_peak3_center
   - neighbor_1

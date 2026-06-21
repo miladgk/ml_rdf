@@ -174,6 +174,8 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1) -> pd.DataFrame:
     q6 = df.get("q6", np.nan).astype(float)
     w4 = df.get("w4", np.nan).astype(float)
     w6 = df.get("w6", np.nan).astype(float)
+    q4_avg = df.get("q4_avg", np.nan).astype(float)
+    q6_avg = df.get("q6_avg", np.nan).astype(float)
     gaussian_peak2 = df.get("gaussian_peak2_center", np.nan).astype(float)
     gaussian_peak3 = df.get("gaussian_peak3_center", np.nan).astype(float)
     validated_sqrt3 = df.get("validated_sqrt3_r_SG", np.nan).astype(float)
@@ -270,6 +272,8 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1) -> pd.DataFrame:
         "q6": q6,
         "w4": w4,
         "w6": w6,
+        "q4_avg": q4_avg,
+        "q6_avg": q6_avg,
     })
 
     # Add neighbor columns
@@ -282,7 +286,8 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1) -> pd.DataFrame:
     fill_cols = [
         "R1", "sqrt3_peak", "sqrt4_peak", "sqrt7_peak", "sqrt12_peak",
         "sqrt3_ratio", "sqrt4_ratio", "sqrt7_ratio", "sqrt12_ratio",
-        "voronoi_volume_temporal", "CN_temporal", "q4", "q6", "w4", "w6"
+        "voronoi_volume_temporal", "CN_temporal", "q4", "q6", "w4", "w6",
+        "q4_avg", "q6_avg"
     ]
     ml_df[fill_cols] = ml_df.groupby("type")[fill_cols].transform(lambda x: x.fillna(x.median()))
 

@@ -117,22 +117,30 @@ def perform_temporal_averaging(all_snapshots_processed_data):
     q6_values = np.asarray(atom_frame['q6'].tolist(), dtype=object)
     w4_values = np.asarray(atom_frame['w4'].tolist(), dtype=object)
     w6_values = np.asarray(atom_frame['w6'].tolist(), dtype=object)
+    q4_avg_values = np.asarray(atom_frame['q4_avg'].tolist(), dtype=object)
+    q6_avg_values = np.asarray(atom_frame['q6_avg'].tolist(), dtype=object)
 
     q4_mean = np.vectorize(lambda value: float(np.asarray(value, dtype=float).mean()), otypes=[float])
     q6_mean = np.vectorize(lambda value: float(np.asarray(value, dtype=float).mean()), otypes=[float])
     w4_mean = np.vectorize(lambda value: float(np.asarray(value, dtype=float).mean()), otypes=[float])
     w6_mean = np.vectorize(lambda value: float(np.asarray(value, dtype=float).mean()), otypes=[float])
+    q4_avg_mean = np.vectorize(lambda value: float(np.asarray(value, dtype=float).mean()), otypes=[float])
+    q6_avg_mean = np.vectorize(lambda value: float(np.asarray(value, dtype=float).mean()), otypes=[float])
 
     atom_frame['q4'] = q4_mean(q4_values)
     atom_frame['q6'] = q6_mean(q6_values)
     atom_frame['w4'] = w4_mean(w4_values)
     atom_frame['w6'] = w6_mean(w6_values)
+    atom_frame['q4_avg'] = q4_avg_mean(q4_avg_values)
+    atom_frame['q6_avg'] = q6_avg_mean(q6_avg_values)
 
     grouped_atoms = atom_frame.groupby('id', sort=False, observed=True)
     q4_avg_over_time = grouped_atoms['q4'].mean().to_dict()
     q6_avg_over_time = grouped_atoms['q6'].mean().to_dict()
     w4_avg_over_time = grouped_atoms['w4'].mean().to_dict()
     w6_avg_over_time = grouped_atoms['w6'].mean().to_dict()
+    q4_avg_avg_over_time = grouped_atoms['q4_avg'].mean().to_dict()
+    q6_avg_avg_over_time = grouped_atoms['q6_avg'].mean().to_dict()
 
     atom_ids = atom_frame['id'].to_numpy(dtype=int)
     unique_ids, inverse = np.unique(atom_ids, return_inverse=True)
@@ -209,6 +217,8 @@ def perform_temporal_averaging(all_snapshots_processed_data):
             averaged_entry['q6_temporal'] = q6_avg_over_time.get(atom_id, np.nan)
             averaged_entry['w4_temporal'] = w4_avg_over_time.get(atom_id, np.nan)
             averaged_entry['w6_temporal'] = w6_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['q4_avg_temporal'] = q4_avg_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['q6_avg_temporal'] = q6_avg_avg_over_time.get(atom_id, np.nan)
             final_atom_data_list.append(averaged_entry)
         else:
             logging.warning(

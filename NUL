@@ -1,3 +1,0 @@
-2026-06-11 13:13:01,976 [INFO] Using SciPy's fftpack for FFTs
-2026-06-11 13:13:02,007 [INFO] Starting structural analysis pipeline.
-2026-06-11 13:13:02,008 [ERROR] Config file not found: config.yaml
