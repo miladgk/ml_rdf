@@ -226,6 +226,17 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
         q6_avg = steinhardt_6_avg.particle_order
 
         # ----------------------------------------------------------------------
+        # Compute Voronoi index ⟨n3, n4, n5, n6⟩ via pyvoro (separate call)
+        # ----------------------------------------------------------------------
+        try:
+            voronoi_index_results = voronoi.compute_voronoi_index(
+                pos, limits, block_size, radii, area_cutoff_fraction=0.01
+            )
+        except Exception as e:
+            logging.warning(f"Voronoi index computation failed: {e}")
+            voronoi_index_results = [{'n3': 0, 'n4': 0, 'n5': 0, 'n6': 0} for _ in range(num_atoms)]
+
+        # ----------------------------------------------------------------------
         # Assemble atom-level data
         # ----------------------------------------------------------------------
         atom_data = []
@@ -251,6 +262,10 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
                     'w6': w6[atom_index],
                     'q4_avg': q4_avg[atom_index],
                     'q6_avg': q6_avg[atom_index],
+                    'n3_voronoi': voronoi_index_results[atom_index]['n3'],
+                    'n4_voronoi': voronoi_index_results[atom_index]['n4'],
+                    'n5_voronoi': voronoi_index_results[atom_index]['n5'],
+                    'n6_voronoi': voronoi_index_results[atom_index]['n6'],
                 })
             else:
                 logging.warning(

@@ -154,6 +154,10 @@ def perform_temporal_averaging(all_snapshots_processed_data):
 
     volume_avg_over_time = grouped_atoms['voronoi_volume'].mean().to_dict()
     CN_avg_over_time = grouped_atoms['num_neighbors'].mean().to_dict()
+    n3_avg_over_time = grouped_atoms['n3_voronoi'].mean().to_dict()
+    n4_avg_over_time = grouped_atoms['n4_voronoi'].mean().to_dict()
+    n5_avg_over_time = grouped_atoms['n5_voronoi'].mean().to_dict()
+    n6_avg_over_time = grouped_atoms['n6_voronoi'].mean().to_dict()
 
     neighbor_records = pd.DataFrame.from_records(
         atom_frame['neighbors_by_type'].apply(lambda x: dict(x) if isinstance(x, dict) else {}).tolist(),
@@ -219,6 +223,16 @@ def perform_temporal_averaging(all_snapshots_processed_data):
             averaged_entry['w6_temporal'] = w6_avg_over_time.get(atom_id, np.nan)
             averaged_entry['q4_avg_temporal'] = q4_avg_avg_over_time.get(atom_id, np.nan)
             averaged_entry['q6_avg_temporal'] = q6_avg_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['n3_temporal'] = n3_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['n4_temporal'] = n4_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['n5_temporal'] = n5_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['n6_temporal'] = n6_avg_over_time.get(atom_id, np.nan)
+            # Pentagon fraction: n5 / (n3 + n4 + n5 + n6) with 1e-8 guard
+            n_sum = (n3_avg_over_time.get(atom_id, 0) + n4_avg_over_time.get(atom_id, 0) +
+                     n5_avg_over_time.get(atom_id, 0) + n6_avg_over_time.get(atom_id, 0))
+            averaged_entry['pentagon_fraction_temporal'] = (
+                n5_avg_over_time.get(atom_id, 0) / (n_sum + 1e-8)
+            )
             final_atom_data_list.append(averaged_entry)
         else:
             logging.warning(

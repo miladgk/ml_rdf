@@ -56,6 +56,11 @@ def perform_temporal_first_spatial_analysis(initial_atom_data_list, r_values_bin
             'q6_temporal': atom_data.get('q6_temporal'),
             'q4_avg_temporal': atom_data.get('q4_avg_temporal'),
             'q6_avg_temporal': atom_data.get('q6_avg_temporal'),
+            'n3_temporal': atom_data.get('n3_temporal'),
+            'n4_temporal': atom_data.get('n4_temporal'),
+            'n5_temporal': atom_data.get('n5_temporal'),
+            'n6_temporal': atom_data.get('n6_temporal'),
+            'pentagon_fraction_temporal': atom_data.get('pentagon_fraction_temporal'),
         })
 
     # Build id -> index lookup

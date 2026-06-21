@@ -176,6 +176,11 @@ def csv_export(initial_atom_data_list, all_analysis_results, params, analysis_le
             'w6': original_temporal_data.get('w6_temporal', np.nan),
             'q4_avg': original_temporal_data.get('q4_avg_temporal', np.nan),
             'q6_avg': original_temporal_data.get('q6_avg_temporal', np.nan),
+            'n3_temporal': original_temporal_data.get('n3_temporal', np.nan),
+            'n4_temporal': original_temporal_data.get('n4_temporal', np.nan),
+            'n5_temporal': original_temporal_data.get('n5_temporal', np.nan),
+            'n6_temporal': original_temporal_data.get('n6_temporal', np.nan),
+            'pentagon_fraction_temporal': original_temporal_data.get('pentagon_fraction_temporal', np.nan),
         }
 
         neighbors_dict = original_temporal_data.get('neighbors_by_type_temporal', {})
@@ -232,6 +237,8 @@ def csv_export(initial_atom_data_list, all_analysis_results, params, analysis_le
         'gaussian_fit_r_squared',
         'q4', 'q6', 'w4', 'w6',
         'q4_avg', 'q6_avg',
+        'n3_temporal', 'n4_temporal', 'n5_temporal', 'n6_temporal',
+        'pentagon_fraction_temporal',
     ]
     column_order.extend(neighbor_type_cols)
     existing_columns = df_final_results.columns.tolist()
