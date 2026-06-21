@@ -273,7 +273,13 @@ def run_pipeline(config_path: str | None = None) -> None:
         if not os.path.isabs(oc):
             params['output_csv'] = os.path.normpath(os.path.join(params_resolve_dir, oc))
 
+    if 'PLOT_OUTPUT_FILE' in params and isinstance(params['PLOT_OUTPUT_FILE'], str):
+        pf = params['PLOT_OUTPUT_FILE']
+        if not os.path.isabs(pf):
+            params['PLOT_OUTPUT_FILE'] = os.path.normpath(os.path.join(params_resolve_dir, pf))
+
     os.makedirs(os.path.dirname(params.get('output_csv', 'outputs/')), exist_ok=True)
+    os.makedirs(os.path.dirname(params.get('PLOT_OUTPUT_FILE', 'outputs/')), exist_ok=True)
 
     bins_for_rdf_calc = rdf.create_adaptive_bins(params["R_MIN"], params["R_MAX"], params["NUM_BINS"])
     bin_volumes_for_rdf_calc = 4 / 3 * np.pi * (bins_for_rdf_calc[1:]**3 - bins_for_rdf_calc[:-1]**3)
