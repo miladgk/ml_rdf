@@ -257,6 +257,7 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
                     'n4_voronoi': voronoi_cells[atom_index].get('voronoi_index', {}).get('n4', 0),
                     'n5_voronoi': voronoi_cells[atom_index].get('voronoi_index', {}).get('n5', 0),
                     'n6_voronoi': voronoi_cells[atom_index].get('voronoi_index', {}).get('n6', 0),
+                    'asphericity_voronoi': voronoi_cells[atom_index].get('voronoi_index', {}).get('asphericity', np.nan),
                 })
             else:
                 logging.warning(

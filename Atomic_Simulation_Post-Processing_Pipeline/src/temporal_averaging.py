@@ -158,6 +158,8 @@ def perform_temporal_averaging(all_snapshots_processed_data):
     n4_avg_over_time = grouped_atoms['n4_voronoi'].mean().to_dict()
     n5_avg_over_time = grouped_atoms['n5_voronoi'].mean().to_dict()
     n6_avg_over_time = grouped_atoms['n6_voronoi'].mean().to_dict()
+    asphericity_avg_over_time = grouped_atoms['asphericity_voronoi'].mean().to_dict()
+    asphericity_std_over_time = grouped_atoms['asphericity_voronoi'].std().to_dict()
 
     neighbor_records = pd.DataFrame.from_records(
         atom_frame['neighbors_by_type'].apply(lambda x: dict(x) if isinstance(x, dict) else {}).tolist(),
@@ -233,6 +235,8 @@ def perform_temporal_averaging(all_snapshots_processed_data):
             averaged_entry['pentagon_fraction_temporal'] = (
                 n5_avg_over_time.get(atom_id, 0) / (n_sum + 1e-8)
             )
+            averaged_entry['asphericity_temporal'] = asphericity_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['asphericity_std_temporal'] = asphericity_std_over_time.get(atom_id, np.nan)
             final_atom_data_list.append(averaged_entry)
         else:
             logging.warning(

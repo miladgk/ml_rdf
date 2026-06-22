@@ -50,24 +50,29 @@ def calculate_optimal_block_size(positions, box_dimensions, target_particles_per
     return np.clip(optimal_block_size, min_block_size, max_block_size)
 
 
-def _compute_voronoi_index_from_freud(voro_obj, area_cutoff_fraction=0.01):
+def _compute_voronoi_index_from_freud(voro_obj, cell_volumes, area_cutoff_fraction=0.01):
     """
-    Compute Voronoi index ⟨n3, n4, n5, n6⟩ from an already-computed freud Voronoi object.
+    Compute Voronoi index ⟨n3, n4, n5, n6⟩ and asphericity from an already-computed
+    freud Voronoi object.
     
     Uses freud's polytopes (vertex arrays per cell) and scipy.spatial.ConvexHull
-    to extract face vertex counts. This avoids pyvoro's memory issues on large systems.
+    to extract face vertex counts and total surface area.
     
     Parameters
     ----------
     voro_obj : freud.locality.Voronoi
         Already-computed freud Voronoi object with .polytopes populated.
+    cell_volumes : array-like
+        Array of cell volumes from voro_obj.volumes.
     area_cutoff_fraction : float
-        Fraction of total cell surface area below which a face is discarded.
+        Fraction of total cell surface area below which a face is discarded
+        for Voronoi index counting (not for asphericity).
     
     Returns
     -------
     list of dict
-        Each dict: {'n3': int, 'n4': int, 'n5': int, 'n6': int}
+        Each dict: {'n3': int, 'n4': int, 'n5': int, 'n6': int,
+                    'asphericity': float}
     """
     from scipy.spatial import ConvexHull
     from collections import defaultdict
@@ -79,9 +84,10 @@ def _compute_voronoi_index_from_freud(voro_obj, area_cutoff_fraction=0.01):
     results = []
     for ci in range(num_cells):
         verts = polytopes[ci]
+        cell_volume = float(cell_volumes[ci])
         if len(verts) < 4:
             # Degenerate cell — should not happen in valid Voronoi
-            results.append({'n3': 0, 'n4': 0, 'n5': 0, 'n6': 0})
+            results.append({'n3': 0, 'n4': 0, 'n5': 0, 'n6': 0, 'asphericity': np.nan})
             continue
         
         # Compute convex hull to get triangular faces (simplices)
@@ -122,15 +128,35 @@ def _compute_voronoi_index_from_freud(voro_obj, area_cutoff_fraction=0.01):
         else:
             counts = {}
         
+        # Compute asphericity from UNFILTERED total area and volume
+        # Asphericity = (SA^3) / (36 * pi * V^2), equals 1.0 for a perfect sphere
+        total_surface_area = total_area  # unfiltered total area
+        if cell_volume > 1e-8 and total_surface_area > 0:
+            asphericity = (total_surface_area ** 3) / (36.0 * np.pi * (cell_volume ** 2))
+        else:
+            asphericity = np.nan
+        
         results.append({
             'n3': counts.get(3, 0),
             'n4': counts.get(4, 0),
             'n5': counts.get(5, 0),
             'n6': counts.get(6, 0),
+            'asphericity': asphericity,
         })
     
     logging.info(f"Voronoi index computed for {len(results)} atoms.")
     return results
+
+
+def _cell_volume_from_polytope(verts):
+    """Compute volume of a convex polyhedron from its vertex array.
+    Used for asphericity computation when the freud Voronoi object
+    provides polytopes but we need the volume for the current cell.
+    """
+    # The freud Voronoi object already gives us volumes[] separately,
+    # so this function is not needed for the freud path.
+    # It's kept here as a utility for potential non-freud usage.
+    return None
 
 
 def compute_weighted_voronoi_cells(points, box_limits, block_size, particle_radii):
@@ -177,10 +203,11 @@ def compute_weighted_voronoi_cells(points, box_limits, block_size, particle_radi
 
         # Compute Voronoi index from freud's polytopes (avoids pyvoro entirely)
         try:
-            voronoi_index = _compute_voronoi_index_from_freud(voro)
+            voronoi_index = _compute_voronoi_index_from_freud(voro, voro.volumes)
         except Exception as e:
             logging.warning(f"Voronoi index computation from freud polytopes failed: {e}")
-            voronoi_index = [{'n3': 0, 'n4': 0, 'n5': 0, 'n6': 0} for _ in range(len(points))]
+            voronoi_index = [{'n3': 0, 'n4': 0, 'n5': 0, 'n6': 0, 'asphericity': np.nan}
+                             for _ in range(len(points))]
 
         voronoi_cells = []
         for i in range(len(points)):

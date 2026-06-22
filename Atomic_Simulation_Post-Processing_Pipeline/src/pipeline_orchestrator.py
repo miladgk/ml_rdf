@@ -181,6 +181,8 @@ def csv_export(initial_atom_data_list, all_analysis_results, params, analysis_le
             'n5_temporal': original_temporal_data.get('n5_temporal', np.nan),
             'n6_temporal': original_temporal_data.get('n6_temporal', np.nan),
             'pentagon_fraction_temporal': original_temporal_data.get('pentagon_fraction_temporal', np.nan),
+            'asphericity_temporal': original_temporal_data.get('asphericity_temporal', np.nan),
+            'asphericity_std_temporal': original_temporal_data.get('asphericity_std_temporal', np.nan),
         }
 
         neighbors_dict = original_temporal_data.get('neighbors_by_type_temporal', {})
@@ -239,6 +241,7 @@ def csv_export(initial_atom_data_list, all_analysis_results, params, analysis_le
         'q4_avg', 'q6_avg',
         'n3_temporal', 'n4_temporal', 'n5_temporal', 'n6_temporal',
         'pentagon_fraction_temporal',
+        'asphericity_temporal', 'asphericity_std_temporal',
     ]
     column_order.extend(neighbor_type_cols)
     existing_columns = df_final_results.columns.tolist()
