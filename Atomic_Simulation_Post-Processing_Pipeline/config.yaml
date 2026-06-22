@@ -21,8 +21,8 @@
 # Input / Output
 # -----------------------------------------------------------------------------
 radius_file: "input.txt"                         # Input file containing RDF radii (fallback)
-output_csv: "outputs/features_4656.csv"            # Output CSV for per-atom results
-SNAPSHOT_DIRECTORY: "files/snapshots_4656/"      # Directory with LAMMPS snapshots
+output_csv: "outputs/features_polyamorphous.csv"            # Output CSV for per-atom results
+SNAPSHOT_DIRECTORY: "files/snapshots_polyamorphous/"      # Directory with LAMMPS snapshots
 
 # -----------------------------------------------------------------------------
 # Atomic Radii (angstrom) — used for free volume and packing fraction

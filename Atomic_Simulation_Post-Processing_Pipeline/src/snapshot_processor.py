@@ -227,10 +227,13 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
 
         # ----------------------------------------------------------------------
         # Compute Voronoi index ⟨n3, n4, n5, n6⟩ via pyvoro (separate call)
+        # Use a much larger block size for pyvoro to reduce memory overhead
+        # (Voro++ allocates per-block structures; fewer blocks = less memory)
         # ----------------------------------------------------------------------
         try:
+            pyvoro_block_size = max(block_size * 3, 15.0)
             voronoi_index_results = voronoi.compute_voronoi_index(
-                pos, limits, block_size, radii, area_cutoff_fraction=0.01
+                pos, limits, pyvoro_block_size, radii, area_cutoff_fraction=0.01
             )
         except Exception as e:
             logging.warning(f"Voronoi index computation failed: {e}")
