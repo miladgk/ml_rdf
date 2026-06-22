@@ -127,10 +127,11 @@ def get_model_class(class_path: str):
 
 def group_train_test_split_fixed(df, group_col, target_col, test_size, random_state):
     """
-    Perform group-aware train-test split using GroupShuffleSplit, with a fix for 2 groups.
+    Perform group-aware train-test split.
 
-    For the 2-group case, each group is split independently (train/test within group),
-    ensuring both phases are represented in both train and test sets.
+    Each group is split independently (train/test within group),
+    ensuring all classes are represented in both train and test sets.
+    Works for any number of groups (2, 3, or more).
 
     Parameters
     ----------
@@ -160,24 +161,17 @@ def group_train_test_split_fixed(df, group_col, target_col, test_size, random_st
         logger.error(f"Found only {n_groups} group(s). Group-aware splitting is not possible.")
         return np.array([], dtype=int), np.array([], dtype=int)
 
-    # Optimized 2-group case: split each group independently
-    if n_groups == 2:
-        logger.info("2 groups detected: splitting each group independently for balanced representation.")
-        g0, g1 = unique_groups[0], unique_groups[1]
-        idx_g0 = df[df[group_col] == g0].index
-        idx_g1 = df[df[group_col] == g1].index
+    logger.info(f"{n_groups} groups detected: splitting each group independently for balanced representation.")
+    train_parts = []
+    test_parts = []
+    for g in unique_groups:
+        idx_g = df[df[group_col] == g].index
+        tr, te = train_test_split(idx_g, test_size=test_size, random_state=random_state)
+        train_parts.append(tr)
+        test_parts.append(te)
 
-        train_0, test_0 = train_test_split(idx_g0, test_size=test_size, random_state=random_state)
-        train_1, test_1 = train_test_split(idx_g1, test_size=test_size, random_state=random_state)
-
-        train_idx = np.concatenate([train_0, train_1])
-        test_idx = np.concatenate([test_0, test_1])
-        return train_idx, test_idx
-
-    logger.info(f"Using GroupShuffleSplit to divide {n_groups} groups. Test size is {test_size}")
-    gss = GroupShuffleSplit(n_splits=1, test_size=test_size, random_state=random_state)
-    train_idx, test_idx = next(gss.split(df, y=df[target_col], groups=df[group_col]))
-
+    train_idx = np.concatenate(train_parts)
+    test_idx = np.concatenate(test_parts)
     return train_idx, test_idx
 
 
@@ -207,7 +201,12 @@ def main(config_path: str = "config.yaml"):
     logger.info("--- Loading and preparing data ---")
     df_a = load_and_label(cfg['data']['phase_A_csv'], phase_label=0, group_id=cfg['data'].get('phase_A_group_id'))
     df_b = load_and_label(cfg['data']['phase_B_csv'], phase_label=1, group_id=cfg['data'].get('phase_B_group_id'))
-    df = pd.concat([df_a, df_b], ignore_index=True)
+    dfs = [df_a, df_b]
+    if 'phase_C_csv' in cfg['data']:
+        df_c = load_and_label(cfg['data']['phase_C_csv'], phase_label=2, group_id=cfg['data'].get('phase_C_group_id'))
+        dfs.append(df_c)
+        logger.info("3-class mode: phase_C loaded")
+    df = pd.concat(dfs, ignore_index=True)
 
     feature_cols = cfg['features']
     categorical_features = cfg.get('categorical_features', [])

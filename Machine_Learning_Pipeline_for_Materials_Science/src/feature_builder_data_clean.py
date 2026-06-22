@@ -188,6 +188,13 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
     w6 = df.get("w6", np.nan).astype(float)
     q4_avg = df.get("q4_avg", np.nan).astype(float)
     q6_avg = df.get("q6_avg", np.nan).astype(float)
+    n3 = df.get("n3_temporal", np.nan).astype(float)
+    n4 = df.get("n4_temporal", np.nan).astype(float)
+    n5 = df.get("n5_temporal", np.nan).astype(float)
+    n6 = df.get("n6_temporal", np.nan).astype(float)
+    pentagon_frac = df.get("pentagon_fraction_temporal", np.nan).astype(float)
+    asphericity = df.get("asphericity_temporal", np.nan).astype(float)
+    asphericity_std = df.get("asphericity_std_temporal", np.nan).astype(float)
     gaussian_peak2 = df.get("gaussian_peak2_center", np.nan).astype(float)
     gaussian_peak3 = df.get("gaussian_peak3_center", np.nan).astype(float)
     validated_sqrt3 = df.get("validated_sqrt3_r_SG", np.nan).astype(float)
@@ -286,6 +293,13 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
         "w6": w6,
         "q4_avg": q4_avg,
         "q6_avg": q6_avg,
+        "n3_temporal": n3,
+        "n4_temporal": n4,
+        "n5_temporal": n5,
+        "n6_temporal": n6,
+        "pentagon_fraction_temporal": pentagon_frac,
+        "asphericity_temporal": asphericity,
+        "asphericity_std_temporal": asphericity_std,
     })
 
     # Add neighbor columns
@@ -299,7 +313,9 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
         "R1", "sqrt3_peak", "sqrt4_peak", "sqrt7_peak", "sqrt12_peak",
         "sqrt3_ratio", "sqrt4_ratio", "sqrt7_ratio", "sqrt12_ratio",
         "voronoi_volume_temporal", "CN_temporal", "q4", "q6", "w4", "w6",
-        "q4_avg", "q6_avg"
+        "q4_avg", "q6_avg",
+        "n3_temporal", "n4_temporal", "n5_temporal", "n6_temporal",
+        "pentagon_fraction_temporal", "asphericity_temporal", "asphericity_std_temporal",
     ]
     ml_df[fill_cols] = ml_df.groupby("type")[fill_cols].transform(lambda x: x.fillna(x.median()))
 
