@@ -93,6 +93,12 @@ tuning:
   n_jobs: -1
 
 
+# -----------------------------------------------------------------------------
+# Prediction Settings (for apply_model_to_unlabeled)
+# -----------------------------------------------------------------------------
+prediction:
+  confidence_threshold: 0.90     # Min probability for confident assignment; below this -> -1 (uncertain)
+
 #
 # --- Output and Reproducibility Settings ---
 #
