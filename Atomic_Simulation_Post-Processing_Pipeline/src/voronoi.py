@@ -6,8 +6,7 @@ Voronoi-based Spatial Partitioning Utilities for 3D Particle Simulations
 
 This module provides utility functions for computing weighted Voronoi tessellations
 in 3D periodic domains. It focuses on computational efficiency through adaptive
-block sizing based on particle density. This is useful for scientific computing
-workflows involving spatial decomposition, particle simulations, and geometric analysis.
+block sizing based on particle density.
 
 Key functionalities:
 - Optimal Block Size Calculation: Dynamically determines a suitable block size 
@@ -15,11 +14,13 @@ Key functionalities:
   and desired particle density per block.
 - Weighted Voronoi Tessellation: Generates Voronoi cells in 3D space with periodic 
   boundary conditions, supporting radius-based weighting for accurate partitioning.
-- Voronoi Index: Computes per-atom ⟨n3, n4, n5, n6⟩ face counts via pyvoro.
+- Voronoi Index: Computes per-atom ⟨n3, n4, n5, n6⟩ face counts using freud's
+  polytopes + scipy ConvexHull (no pyvoro dependency for this).
 
 Dependencies:
 - NumPy: Efficient numerical computations for volume, density, and scaling calculations.
-- PyVoro: Python interface to Voro++ for high-performance Voronoi tessellation.
+- freud: Primary Voronoi backend (volumes, neighbor lists, polytope vertices).
+- PyVoro: Fallback Voronoi backend when freud is unavailable.
 
 """
 
@@ -28,20 +29,18 @@ import numpy as np
 
 try:
     import pyvoro
-except Exception:  # pragma: no cover - depends on optional geometry backend
+except Exception:
     pyvoro = None
 
 try:
     from scipy.spatial import KDTree
-except Exception:  # pragma: no cover - SciPy is required for the fallback path
+except Exception:
     KDTree = None
 
 
 def calculate_optimal_block_size(positions, box_dimensions, target_particles_per_block=50, 
                                  min_block_factor=1/20, max_block_factor=1/5):
-    """
-    Determine an optimal block size for Voronoi tessellation based on particle density.
-    """
+    """Determine an optimal block size for Voronoi tessellation based on particle density."""
     total_volume = np.prod(box_dimensions)
     particle_density = len(positions) / total_volume
     target_block_volume = target_particles_per_block / particle_density
@@ -51,6 +50,89 @@ def calculate_optimal_block_size(positions, box_dimensions, target_particles_per
     return np.clip(optimal_block_size, min_block_size, max_block_size)
 
 
+def _compute_voronoi_index_from_freud(voro_obj, area_cutoff_fraction=0.01):
+    """
+    Compute Voronoi index ⟨n3, n4, n5, n6⟩ from an already-computed freud Voronoi object.
+    
+    Uses freud's polytopes (vertex arrays per cell) and scipy.spatial.ConvexHull
+    to extract face vertex counts. This avoids pyvoro's memory issues on large systems.
+    
+    Parameters
+    ----------
+    voro_obj : freud.locality.Voronoi
+        Already-computed freud Voronoi object with .polytopes populated.
+    area_cutoff_fraction : float
+        Fraction of total cell surface area below which a face is discarded.
+    
+    Returns
+    -------
+    list of dict
+        Each dict: {'n3': int, 'n4': int, 'n5': int, 'n6': int}
+    """
+    from scipy.spatial import ConvexHull
+    from collections import defaultdict
+    
+    polytopes = voro_obj.polytopes
+    num_cells = len(polytopes)
+    logging.info(f"Computing Voronoi index from freud polytopes ({num_cells} cells)...")
+    
+    results = []
+    for ci in range(num_cells):
+        verts = polytopes[ci]
+        if len(verts) < 4:
+            # Degenerate cell — should not happen in valid Voronoi
+            results.append({'n3': 0, 'n4': 0, 'n5': 0, 'n6': 0})
+            continue
+        
+        # Compute convex hull to get triangular faces (simplices)
+        hull = ConvexHull(verts)
+        
+        # Group simplex triangles by their plane equation to reconstruct polygonal faces.
+        # Each row in hull.equations is (nx, ny, nz, offset) for the plane.
+        # Triangles sharing the same plane belong to the same polygonal face.
+        groups = defaultdict(list)
+        for i, eq in enumerate(hull.equations):
+            # Use rounded plane normal + offset as unique key for each face
+            key = (np.round(eq[:3], 5).tobytes(), round(eq[3], 5))
+            groups[key].append(i)
+        
+        # For a convex polygon with N vertices, it's triangulated into N-2 triangles.
+        # So number of triangles per face + 2 = number of vertices in that face.
+        face_vertex_counts = []
+        face_areas = []
+        for tris in groups.values():
+            n_verts = len(tris) + 2
+            # Compute face area: sum area of its constituent triangles
+            face_area = 0.0
+            for tri_idx in tris:
+                tri = hull.simplices[tri_idx]
+                v0, v1, v2 = verts[tri[0]], verts[tri[1]], verts[tri[2]]
+                face_area += 0.5 * np.linalg.norm(np.cross(v1 - v0, v2 - v0))
+            face_vertex_counts.append(n_verts)
+            face_areas.append(face_area)
+        
+        # Apply area cutoff
+        total_area = sum(face_areas) if face_areas else 0.0
+        if total_area > 0:
+            cutoff = area_cutoff_fraction * total_area
+            counts = {}
+            for nv, area in zip(face_vertex_counts, face_areas):
+                if area >= cutoff and 3 <= nv <= 6:
+                    counts[nv] = counts.get(nv, 0) + 1
+        else:
+            counts = {}
+        
+        results.append({
+            'n3': counts.get(3, 0),
+            'n4': counts.get(4, 0),
+            'n5': counts.get(5, 0),
+            'n6': counts.get(6, 0),
+        })
+    
+    logging.info(f"Voronoi index computed for {len(results)} atoms.")
+    return results
+
+
 def compute_weighted_voronoi_cells(points, box_limits, block_size, particle_radii):
     """
     Compute a weighted Voronoi tessellation for 3D points.
@@ -58,12 +140,8 @@ def compute_weighted_voronoi_cells(points, box_limits, block_size, particle_radi
     Uses freud's Voronoi implementation when available (fastest), falls back to
     PyVoro, and finally to a SciPy KDTree approximation if neither is available.
 
-    freud's Voronoi is typically 2-3x faster than PyVoro for large systems since
-    it uses optimized C++ with periodic boundary support natively.
-
-    NOTE: freud does NOT return face vertex/area data, only volumes
-    and neighbor lists. For Voronoi index (n3,n4,n5,n6), a separate
-    pyvoro call is needed (see compute_voronoi_index).
+    This function returns both the standard cell data AND the Voronoi index
+    results by reusing freud's polytopes internally.
     """
     points = np.asarray(points, dtype=float)
     box_limits = np.asarray(box_limits, dtype=float)
@@ -72,6 +150,8 @@ def compute_weighted_voronoi_cells(points, box_limits, block_size, particle_radi
 
     # ----------------------------------------------------------------
     # Try freud first (fastest for periodic systems).
+    # freud computes volumes, neighbor lists, AND polytope vertices.
+    # The polytopes are reused below for Voronoi index extraction.
     # ----------------------------------------------------------------
     try:
         import freud
@@ -87,12 +167,20 @@ def compute_weighted_voronoi_cells(points, box_limits, block_size, particle_radi
         if not hasattr(voro, 'volumes') or len(voro.volumes) != len(points):
             raise RuntimeError("freud Voronoi returned unexpected output")
 
+        # Extract neighbor list
         nlist = voro.nlist
         neighbor_groups = defaultdict(list)
         for pair in nlist:
             i = int(pair[0])
             j = int(pair[1])
             neighbor_groups[i].append(j)
+
+        # Compute Voronoi index from freud's polytopes (avoids pyvoro entirely)
+        try:
+            voronoi_index = _compute_voronoi_index_from_freud(voro)
+        except Exception as e:
+            logging.warning(f"Voronoi index computation from freud polytopes failed: {e}")
+            voronoi_index = [{'n3': 0, 'n4': 0, 'n5': 0, 'n6': 0} for _ in range(len(points))]
 
         voronoi_cells = []
         for i in range(len(points)):
@@ -102,16 +190,17 @@ def compute_weighted_voronoi_cells(points, box_limits, block_size, particle_radi
             voronoi_cells.append({
                 'volume': cell_volume,
                 'faces': faces,
+                'voronoi_index': voronoi_index[i],
             })
 
-        logging.info("Voronoi backend: freud")
+        logging.info("Voronoi backend: freud (with Voronoi index)")
         return voronoi_cells
 
     except Exception:
         pass
 
     # ----------------------------------------------------------------
-    # Fallback to PyVoro
+    # Fallback to PyVoro (also computes face data)
     # ----------------------------------------------------------------
     if pyvoro is not None:
         try:
@@ -123,12 +212,16 @@ def compute_weighted_voronoi_cells(points, box_limits, block_size, particle_radi
                 radii=particle_radii
             )
             logging.info("Voronoi backend: pyvoro")
+            # Also add Voronoi index from pyvoro faces
+            voronoi_index = _compute_voronoi_index_from_pyvoro(result)
+            for i, cell in enumerate(result):
+                cell['voronoi_index'] = voronoi_index[i]
             return result
         except Exception as exc:
             raise RuntimeError(f"Error during PyVoro tessellation: {exc}") from exc
 
     # ----------------------------------------------------------------
-    # Final fallback: SciPy KDTree approximation
+    # Final fallback: SciPy KDTree approximation (no face data)
     # ----------------------------------------------------------------
     if KDTree is None:
         raise RuntimeError(
@@ -147,115 +240,65 @@ def compute_weighted_voronoi_cells(points, box_limits, block_size, particle_radi
         neighbor_ids = [int(j) for j in neighbors if j != i]
         voronoi_cells.append({
             'volume': cell_volume,
-            'faces': [{'adjacent_cell': neighbor_id} for neighbor_id in neighbor_ids]
+            'faces': [{'adjacent_cell': neighbor_id} for neighbor_id in neighbor_ids],
+            'voronoi_index': {'n3': 0, 'n4': 0, 'n5': 0, 'n6': 0},
         })
 
     return voronoi_cells
 
 
-def compute_voronoi_index(points, box_limits, block_size, particle_radii, area_cutoff_fraction=0.01):
+def _compute_voronoi_index_from_pyvoro(cells, area_cutoff_fraction=0.01):
     """
-    Compute Voronoi index ⟨n3, n4, n5, n6⟩ per atom using pyvoro (Voro++).
+    Compute Voronoi index from pyvoro cell data (with vertex/face info).
     
-    This is a separate, dedicated call for face geometry only, independent of
-    which backend is used for volume/CN computation.
-
     Parameters
     ----------
-    points : array_like
-        Array of particle positions with shape (N, 3).
-    box_limits : array_like
-        Bounds of the simulation box [[x_min, x_max], [y_min, y_max], [z_min, z_max]].
-    block_size : float
-        Size of each computational block.
-    particle_radii : array_like
-        Array of particle radii used for weighted tessellation.
-    area_cutoff_fraction : float, optional
-        Fraction of total cell surface area below which a face is discarded
-        as a sliver (default 0.01 = 1%).
-
+    cells : list
+        pyvoro cell data, each with 'vertices' and 'faces' keys.
+    area_cutoff_fraction : float
+        Fraction of total cell surface area below which a face is discarded.
+    
     Returns
     -------
     list of dict
         Each dict: {'n3': int, 'n4': int, 'n5': int, 'n6': int}
-        for each atom.
-    
-    Raises
-    ------
-    RuntimeError
-        If pyvoro is not installed.
     """
-    if pyvoro is None:
-        raise RuntimeError(
-            "pyvoro is required for Voronoi index computation. "
-            "Install with: pip install pyvoro"
-        )
-
-    points = np.asarray(points, dtype=float)
-    # Convert box_limits to list format expected by pyvoro
-    if hasattr(box_limits, 'tolist'):
-        box_limits_list = box_limits.tolist()
-    else:
-        box_limits_list = [[float(bl[0]), float(bl[1])] for bl in box_limits]
-    radii_list = particle_radii.tolist() if hasattr(particle_radii, 'tolist') else list(particle_radii)
-
-    logging.info("Computing Voronoi index (face geometry) via pyvoro...")
-
-    # Run pyvoro — this is a separate, parallel computation
-    cells = pyvoro.compute_voronoi(
-        points,
-        box_limits_list,
-        float(block_size),
-        periodic=[True, True, True],
-        radii=radii_list
-    )
-
     results = []
     for cell in cells:
-        # Each cell has: 'original', 'volume', 'vertices', 'adjacency', 'faces'
-        verts = np.array(cell['vertices'])  # shape (N_verts, 3)
-        faces = cell['faces']  # list of dict with 'adjacent_cell' and 'vertices'
-
-        # Compute area for each face from vertex positions
+        verts = np.array(cell['vertices'])
+        faces = cell['faces']
+        
         face_areas = []
-        valid_face_vertex_counts = []
+        face_counts = []
         for face in faces:
-            face_vert_indices = face['vertices']
-            if len(face_vert_indices) < 3:
-                continue  # degenerate face
-            
-            # Get vertex positions for this face
-            fverts = verts[face_vert_indices]  # shape (n_verts, 3)
-            
-            # Compute polygon area using triangle fan from first vertex
+            idx = face['vertices']
+            if len(idx) < 3:
+                continue
+            fverts = verts[idx]
             v0 = fverts[0]
             area = 0.0
             for i in range(1, len(fverts) - 1):
                 v1 = fverts[i] - v0
                 v2 = fverts[i + 1] - v0
-                cross = np.cross(v1, v2)
-                area += 0.5 * np.linalg.norm(cross)
-            
+                area += 0.5 * np.linalg.norm(np.cross(v1, v2))
             face_areas.append(area)
-            valid_face_vertex_counts.append(len(face_vert_indices))
-
-        # Apply area cutoff: discard faces below cutoff fraction of total area
+            face_counts.append(len(idx))
+        
         total_area = sum(face_areas) if face_areas else 0.0
         if total_area > 0:
             cutoff = area_cutoff_fraction * total_area
             counts = {}
-            for n_verts, area in zip(valid_face_vertex_counts, face_areas):
-                if area >= cutoff and 3 <= n_verts <= 6:
-                    counts[n_verts] = counts.get(n_verts, 0) + 1
+            for nv, area in zip(face_counts, face_areas):
+                if area >= cutoff and 3 <= nv <= 6:
+                    counts[nv] = counts.get(nv, 0) + 1
         else:
             counts = {}
-
+        
         results.append({
             'n3': counts.get(3, 0),
             'n4': counts.get(4, 0),
             'n5': counts.get(5, 0),
             'n6': counts.get(6, 0),
         })
-
-    logging.info(f"Voronoi index computed for {len(results)} atoms.")
+    
     return results

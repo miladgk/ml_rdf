@@ -226,21 +226,9 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
         q6_avg = steinhardt_6_avg.particle_order
 
         # ----------------------------------------------------------------------
-        # Compute Voronoi index ⟨n3, n4, n5, n6⟩ via pyvoro (separate call)
-        # Use a much larger block size for pyvoro to reduce memory overhead
-        # (Voro++ allocates per-block structures; fewer blocks = less memory)
-        # ----------------------------------------------------------------------
-        try:
-            pyvoro_block_size = max(block_size * 3, 15.0)
-            voronoi_index_results = voronoi.compute_voronoi_index(
-                pos, limits, pyvoro_block_size, radii, area_cutoff_fraction=0.01
-            )
-        except Exception as e:
-            logging.warning(f"Voronoi index computation failed: {e}")
-            voronoi_index_results = [{'n3': 0, 'n4': 0, 'n5': 0, 'n6': 0} for _ in range(num_atoms)]
-
-        # ----------------------------------------------------------------------
         # Assemble atom-level data
+        # Voronoi index ⟨n3, n4, n5, n6⟩ is now embedded in voronoi_cells
+        # from the freud polytopes (computed inside compute_weighted_voronoi_cells)
         # ----------------------------------------------------------------------
         atom_data = []
         for atom_index in range(num_atoms):
@@ -265,10 +253,10 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
                     'w6': w6[atom_index],
                     'q4_avg': q4_avg[atom_index],
                     'q6_avg': q6_avg[atom_index],
-                    'n3_voronoi': voronoi_index_results[atom_index]['n3'],
-                    'n4_voronoi': voronoi_index_results[atom_index]['n4'],
-                    'n5_voronoi': voronoi_index_results[atom_index]['n5'],
-                    'n6_voronoi': voronoi_index_results[atom_index]['n6'],
+                    'n3_voronoi': voronoi_cells[atom_index].get('voronoi_index', {}).get('n3', 0),
+                    'n4_voronoi': voronoi_cells[atom_index].get('voronoi_index', {}).get('n4', 0),
+                    'n5_voronoi': voronoi_cells[atom_index].get('voronoi_index', {}).get('n5', 0),
+                    'n6_voronoi': voronoi_cells[atom_index].get('voronoi_index', {}).get('n6', 0),
                 })
             else:
                 logging.warning(
