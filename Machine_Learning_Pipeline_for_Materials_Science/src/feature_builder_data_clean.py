@@ -353,12 +353,6 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
     ml_df["entropy_time_q4"] = ml_df["entropy"] * ml_df["q4"]
     ml_df["entropy_time_q6"] = ml_df["entropy"] * ml_df["q6"]
 
-    # Normalized by type mean (vectorized groupby)
-    type_mean_cn = ml_df.groupby("type")["CN_temporal"].transform("mean").replace(0, np.nan)
-    ml_df["CN_norm_type"] = ml_df["CN_temporal"] / type_mean_cn
-    type_mean_voronoi = ml_df.groupby("type")["voronoi_volume_temporal"].transform("mean").replace(0, np.nan)
-    ml_df["Voronoi_norm_type"] = ml_df["voronoi_volume_temporal"] / type_mean_voronoi
-
     ml_df["CN_density"] = ml_df["CN_temporal"] / ml_df["R1"].replace(0, np.nan)
     ml_df["log_CN"] = np.log1p(ml_df["CN_temporal"])
     ml_df["log_voronoi"] = np.log1p(ml_df["voronoi_volume_temporal"])
@@ -377,9 +371,6 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
         # Free volume: Voronoi volume minus the atomic sphere volume
         ml_df['free_volume_temporal'] = ml_df['voronoi_volume_temporal'] - ml_df['atomic_sphere_volume']
 
-        # Packing fraction: atomic sphere volume / Voronoi volume
-        ml_df['packing_fraction_temporal'] = ml_df['atomic_sphere_volume'] / ml_df['voronoi_volume_temporal'].replace(0, np.nan)
-
         # Composition fraction: neighbor_1 / CN_temporal
         cn_safe = ml_df["CN_temporal"].replace(0, np.nan)
         ml_df['neighbor_1_fraction_temporal'] = ml_df['neighbor_1'] / cn_safe
@@ -391,7 +382,7 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
         ml_df['volume_per_neighbor'] = ml_df['voronoi_volume_temporal'] / cn_safe
 
         # Add to fill_cols for per-type median imputation
-        extra_fill = ['free_volume_temporal', 'packing_fraction_temporal',
+        extra_fill = ['free_volume_temporal',
                       'neighbor_1_fraction_temporal', 'volume_q6_interaction',
                       'volume_per_neighbor']
         fill_cols.extend(extra_fill)
