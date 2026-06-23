@@ -63,6 +63,9 @@ def perform_temporal_first_spatial_analysis(initial_atom_data_list, r_values_bin
             'pentagon_fraction_temporal': atom_data.get('pentagon_fraction_temporal'),
             'asphericity_temporal': atom_data.get('asphericity_temporal'),
             'asphericity_std_temporal': atom_data.get('asphericity_std_temporal'),
+            's2_entropy_temporal': atom_data.get('s2_entropy_temporal'),
+            's2_entropy_avg_temporal': atom_data.get('s2_entropy_avg_temporal'),
+            'isb_temporal': atom_data.get('isb_temporal'),
         })
 
     # Build id -> index lookup

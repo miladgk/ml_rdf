@@ -160,6 +160,9 @@ def perform_temporal_averaging(all_snapshots_processed_data):
     n6_avg_over_time = grouped_atoms['n6_voronoi'].mean().to_dict()
     asphericity_avg_over_time = grouped_atoms['asphericity_voronoi'].mean().to_dict()
     asphericity_std_over_time = grouped_atoms['asphericity_voronoi'].std().to_dict()
+    s2_entropy_avg_over_time = grouped_atoms['s2_entropy'].mean().to_dict()
+    s2_entropy_avg_avg_over_time = grouped_atoms['s2_entropy_avg'].mean().to_dict()
+    isb_avg_over_time = grouped_atoms['isb'].mean().to_dict()
 
     neighbor_records = pd.DataFrame.from_records(
         atom_frame['neighbors_by_type'].apply(lambda x: dict(x) if isinstance(x, dict) else {}).tolist(),
@@ -237,6 +240,9 @@ def perform_temporal_averaging(all_snapshots_processed_data):
             )
             averaged_entry['asphericity_temporal'] = asphericity_avg_over_time.get(atom_id, np.nan)
             averaged_entry['asphericity_std_temporal'] = asphericity_std_over_time.get(atom_id, np.nan)
+            averaged_entry['s2_entropy_temporal'] = s2_entropy_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['s2_entropy_avg_temporal'] = s2_entropy_avg_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['isb_temporal'] = isb_avg_over_time.get(atom_id, np.nan)
             final_atom_data_list.append(averaged_entry)
         else:
             logging.warning(
@@ -248,6 +254,3 @@ def perform_temporal_averaging(all_snapshots_processed_data):
     return final_atom_data_list, consolidated_metadata
 
 
-if __name__ == '__main__':
-    print("This module is intended to be imported as part of a larger pipeline.")
-    print("Run 'pipeline_orchestrator.py' to execute the full workflow.")

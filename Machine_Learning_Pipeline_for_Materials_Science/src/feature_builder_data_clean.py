@@ -195,6 +195,9 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
     pentagon_frac = df.get("pentagon_fraction_temporal", np.nan).astype(float)
     asphericity = df.get("asphericity_temporal", np.nan).astype(float)
     asphericity_std = df.get("asphericity_std_temporal", np.nan).astype(float)
+    s2_entropy = df.get("s2_entropy_temporal", np.nan).astype(float)
+    s2_entropy_avg = df.get("s2_entropy_avg_temporal", np.nan).astype(float)
+    isb = df.get("isb_temporal", np.nan).astype(float)
     gaussian_peak2 = df.get("gaussian_peak2_center", np.nan).astype(float)
     gaussian_peak3 = df.get("gaussian_peak3_center", np.nan).astype(float)
     validated_sqrt3 = df.get("validated_sqrt3_r_SG", np.nan).astype(float)
@@ -300,6 +303,9 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
         "pentagon_fraction_temporal": pentagon_frac,
         "asphericity_temporal": asphericity,
         "asphericity_std_temporal": asphericity_std,
+        "s2_entropy_temporal": s2_entropy,
+        "s2_entropy_avg_temporal": s2_entropy_avg,
+        "isb_temporal": isb,
     })
 
     # Add neighbor columns

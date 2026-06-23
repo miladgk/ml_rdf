@@ -39,7 +39,7 @@ from freud.box import Box
 # Custom modules
 import io_module
 import voronoi
-from rdf import compute_all_local_rdfs
+from rdf import compute_all_local_rdfs, compute_pair_entropy_s2, compute_isb_vectorized
 
 
 # ------------------------------------------------------------------------------
@@ -188,6 +188,34 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
         logging.info(f"Individual g_i(r) for {snapshot_file} computed.")
 
         # ----------------------------------------------------------------------
+        # Compute pair entropy S2 from per-atom g(r)
+        # ----------------------------------------------------------------------
+        # Bin centers (midpoints of the RDF bins)
+        r_centers = (bins_for_rdf_calc[:-1] + bins_for_rdf_calc[1:]) / 2.0
+        s2_entropy_values = {}
+        for atom_id, gr in local_rdf_results.items():
+            if np.any(np.isfinite(gr)):
+                s2 = compute_pair_entropy_s2(r_centers, gr, density)
+            else:
+                s2 = np.nan
+            s2_entropy_values[atom_id] = s2
+
+        # Extract S2 per atom in order and compute neighbor-averaged version
+        s2_list = np.array([s2_entropy_values[atom_id] for atom_id in ids], dtype=float)
+        s2_avg_list = np.copy(s2_list)
+        for atom_index in range(num_atoms):
+            neigh = processed_vor_neighbors[atom_index]
+            if neigh:
+                neigh_s2 = s2_list[neigh]
+                s2_avg_list[atom_index] = np.mean(neigh_s2)
+
+        # ----------------------------------------------------------------------
+        # Compute inversion symmetry breaking (ISB)
+        # ----------------------------------------------------------------------
+        from rdf import compute_isb_vectorized as compute_isb
+        isb_values = compute_isb(pos_wrapped, processed_vor_neighbors, box_size)
+
+        # ----------------------------------------------------------------------
         # Compute bond orientational order parameters q₄ and q₆
         # ----------------------------------------------------------------------
         box = Box.from_box(box_size)
@@ -258,6 +286,9 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
                     'n5_voronoi': voronoi_cells[atom_index].get('voronoi_index', {}).get('n5', 0),
                     'n6_voronoi': voronoi_cells[atom_index].get('voronoi_index', {}).get('n6', 0),
                     'asphericity_voronoi': voronoi_cells[atom_index].get('voronoi_index', {}).get('asphericity', np.nan),
+                    's2_entropy': s2_list[atom_index],
+                    's2_entropy_avg': s2_avg_list[atom_index],
+                    'isb': isb_values[atom_index],
                 })
             else:
                 logging.warning(
