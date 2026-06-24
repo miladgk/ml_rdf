@@ -69,6 +69,12 @@ def perform_temporal_first_spatial_analysis(initial_atom_data_list, r_values_bin
             'csro_unlike_temporal': atom_data.get('csro_unlike_temporal'),
             'csro_like_temporal': atom_data.get('csro_like_temporal'),
             'csro_unlike_std_temporal': atom_data.get('csro_unlike_std_temporal'),
+            'mean_angle_all_temporal': atom_data.get('mean_angle_all_temporal'),
+            'std_angle_all_temporal': atom_data.get('std_angle_all_temporal'),
+            'skewness_angle_all_temporal': atom_data.get('skewness_angle_all_temporal'),
+            'mean_angle_liketype_temporal': atom_data.get('mean_angle_liketype_temporal'),
+            'mean_angle_unliketype_temporal': atom_data.get('mean_angle_unliketype_temporal'),
+            'mean_angle_mixedtype_temporal': atom_data.get('mean_angle_mixedtype_temporal'),
         })
 
     # Build id -> index lookup

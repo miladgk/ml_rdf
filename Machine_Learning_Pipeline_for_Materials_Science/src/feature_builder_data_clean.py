@@ -201,6 +201,12 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
     csro_unlike = df.get("csro_unlike_temporal", np.nan).astype(float)
     csro_like = df.get("csro_like_temporal", np.nan).astype(float)
     csro_unlike_std = df.get("csro_unlike_std_temporal", np.nan).astype(float)
+    mean_angle_all = df.get("mean_angle_all_temporal", np.nan).astype(float)
+    std_angle_all = df.get("std_angle_all_temporal", np.nan).astype(float)
+    skewness_angle_all = df.get("skewness_angle_all_temporal", np.nan).astype(float)
+    mean_angle_liketype = df.get("mean_angle_liketype_temporal", np.nan).astype(float)
+    mean_angle_unliketype = df.get("mean_angle_unliketype_temporal", np.nan).astype(float)
+    mean_angle_mixedtype = df.get("mean_angle_mixedtype_temporal", np.nan).astype(float)
     gaussian_peak2 = df.get("gaussian_peak2_center", np.nan).astype(float)
     gaussian_peak3 = df.get("gaussian_peak3_center", np.nan).astype(float)
     validated_sqrt3 = df.get("validated_sqrt3_r_SG", np.nan).astype(float)
@@ -312,6 +318,12 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
         "csro_unlike_temporal": csro_unlike,
         "csro_like_temporal": csro_like,
         "csro_unlike_std_temporal": csro_unlike_std,
+        "mean_angle_all_temporal": mean_angle_all,
+        "std_angle_all_temporal": std_angle_all,
+        "skewness_angle_all_temporal": skewness_angle_all,
+        "mean_angle_liketype_temporal": mean_angle_liketype,
+        "mean_angle_unliketype_temporal": mean_angle_unliketype,
+        "mean_angle_mixedtype_temporal": mean_angle_mixedtype,
     })
 
     # Add neighbor columns

@@ -189,6 +189,12 @@ def csv_export(initial_atom_data_list, all_analysis_results, params, analysis_le
             'csro_unlike_temporal': original_temporal_data.get('csro_unlike_temporal', np.nan),
             'csro_like_temporal': original_temporal_data.get('csro_like_temporal', np.nan),
             'csro_unlike_std_temporal': original_temporal_data.get('csro_unlike_std_temporal', np.nan),
+            'mean_angle_all_temporal': original_temporal_data.get('mean_angle_all_temporal', np.nan),
+            'std_angle_all_temporal': original_temporal_data.get('std_angle_all_temporal', np.nan),
+            'skewness_angle_all_temporal': original_temporal_data.get('skewness_angle_all_temporal', np.nan),
+            'mean_angle_liketype_temporal': original_temporal_data.get('mean_angle_liketype_temporal', np.nan),
+            'mean_angle_unliketype_temporal': original_temporal_data.get('mean_angle_unliketype_temporal', np.nan),
+            'mean_angle_mixedtype_temporal': original_temporal_data.get('mean_angle_mixedtype_temporal', np.nan),
         }
 
         neighbors_dict = original_temporal_data.get('neighbors_by_type_temporal', {})
@@ -250,6 +256,8 @@ def csv_export(initial_atom_data_list, all_analysis_results, params, analysis_le
         'asphericity_temporal', 'asphericity_std_temporal',
         's2_entropy_temporal', 's2_entropy_avg_temporal', 'isb_temporal',
         'csro_unlike_temporal', 'csro_like_temporal', 'csro_unlike_std_temporal',
+        'mean_angle_all_temporal', 'std_angle_all_temporal', 'skewness_angle_all_temporal',
+        'mean_angle_liketype_temporal', 'mean_angle_unliketype_temporal', 'mean_angle_mixedtype_temporal',
     ]
     column_order.extend(neighbor_type_cols)
     existing_columns = df_final_results.columns.tolist()

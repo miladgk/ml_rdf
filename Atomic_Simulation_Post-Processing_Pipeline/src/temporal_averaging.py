@@ -166,6 +166,12 @@ def perform_temporal_averaging(all_snapshots_processed_data):
     csro_unlike_avg_over_time = grouped_atoms['csro_unlike'].mean().to_dict()
     csro_like_avg_over_time = grouped_atoms['csro_like'].mean().to_dict()
     csro_unlike_std_over_time = grouped_atoms['csro_unlike'].std().to_dict()
+    mean_angle_all_avg = grouped_atoms['mean_angle_all'].mean().to_dict()
+    std_angle_all_avg = grouped_atoms['std_angle_all'].mean().to_dict()
+    skewness_angle_all_avg = grouped_atoms['skewness_angle_all'].mean().to_dict()
+    mean_angle_liketype_avg = grouped_atoms['mean_angle_liketype'].mean().to_dict()
+    mean_angle_unliketype_avg = grouped_atoms['mean_angle_unliketype'].mean().to_dict()
+    mean_angle_mixedtype_avg = grouped_atoms['mean_angle_mixedtype'].mean().to_dict()
 
     neighbor_records = pd.DataFrame.from_records(
         atom_frame['neighbors_by_type'].apply(lambda x: dict(x) if isinstance(x, dict) else {}).tolist(),
@@ -249,6 +255,12 @@ def perform_temporal_averaging(all_snapshots_processed_data):
             averaged_entry['csro_unlike_temporal'] = csro_unlike_avg_over_time.get(atom_id, np.nan)
             averaged_entry['csro_like_temporal'] = csro_like_avg_over_time.get(atom_id, np.nan)
             averaged_entry['csro_unlike_std_temporal'] = csro_unlike_std_over_time.get(atom_id, np.nan)
+            averaged_entry['mean_angle_all_temporal'] = mean_angle_all_avg.get(atom_id, np.nan)
+            averaged_entry['std_angle_all_temporal'] = std_angle_all_avg.get(atom_id, np.nan)
+            averaged_entry['skewness_angle_all_temporal'] = skewness_angle_all_avg.get(atom_id, np.nan)
+            averaged_entry['mean_angle_liketype_temporal'] = mean_angle_liketype_avg.get(atom_id, np.nan)
+            averaged_entry['mean_angle_unliketype_temporal'] = mean_angle_unliketype_avg.get(atom_id, np.nan)
+            averaged_entry['mean_angle_mixedtype_temporal'] = mean_angle_mixedtype_avg.get(atom_id, np.nan)
             final_atom_data_list.append(averaged_entry)
         else:
             logging.warning(
