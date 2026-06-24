@@ -21,8 +21,8 @@
 # Input / Output
 # -----------------------------------------------------------------------------
 radius_file: "input.txt"                         # Input file containing RDF radii (fallback)
-output_csv: "outputs/features_6436.csv"
-SNAPSHOT_DIRECTORY: "files/snapshots_6436/"
+output_csv: "outputs/features_polyamorphous.csv"
+SNAPSHOT_DIRECTORY: "files/snapshots_polyamorphous/"
 
 # -----------------------------------------------------------------------------
 # Atomic Radii (angstrom) — used for free volume and packing fraction
@@ -37,7 +37,7 @@ atomic_radii:
 # Plotting
 # -----------------------------------------------------------------------------
 PLOT_SAMPLE_ATOM_ID: 35                          # Atom ID to plot, or None to disable
-PLOT_OUTPUT_FILE: "outputs/sample_peak_6436.png"
+PLOT_OUTPUT_FILE: "outputs/sample_peak_polyamorphous.png"
 
 # -----------------------------------------------------------------------------
 # Analysis Workflow
@@ -105,6 +105,16 @@ FIT_MAXFEV: 2000                                 # Maximum iterations for curve 
 # Keeping them here for backward compatibility; safe to remove if unused in code.
 FIT_R_MIN_FACTOR: 1.5
 FIT_R_MAX_FACTOR: 2.2
+
+# -----------------------------------------------------------------------------
+# System Composition — used for Warren-Cowley Chemical Short-Range Order (CSRO)
+# -----------------------------------------------------------------------------
+# Set these to the KNOWN bulk composition for labeled systems.
+# For polyamorphous (unknown), set compute_from_snapshot: true
+composition:
+  type_1_fraction: 0.50
+  type_2_fraction: 0.50
+  compute_from_snapshot: true
 
 # -----------------------------------------------------------------------------
 # Multiprocessing

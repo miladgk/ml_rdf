@@ -186,6 +186,9 @@ def csv_export(initial_atom_data_list, all_analysis_results, params, analysis_le
             's2_entropy_temporal': original_temporal_data.get('s2_entropy_temporal', np.nan),
             's2_entropy_avg_temporal': original_temporal_data.get('s2_entropy_avg_temporal', np.nan),
             'isb_temporal': original_temporal_data.get('isb_temporal', np.nan),
+            'csro_unlike_temporal': original_temporal_data.get('csro_unlike_temporal', np.nan),
+            'csro_like_temporal': original_temporal_data.get('csro_like_temporal', np.nan),
+            'csro_unlike_std_temporal': original_temporal_data.get('csro_unlike_std_temporal', np.nan),
         }
 
         neighbors_dict = original_temporal_data.get('neighbors_by_type_temporal', {})
@@ -246,6 +249,7 @@ def csv_export(initial_atom_data_list, all_analysis_results, params, analysis_le
         'pentagon_fraction_temporal',
         'asphericity_temporal', 'asphericity_std_temporal',
         's2_entropy_temporal', 's2_entropy_avg_temporal', 'isb_temporal',
+        'csro_unlike_temporal', 'csro_like_temporal', 'csro_unlike_std_temporal',
     ]
     column_order.extend(neighbor_type_cols)
     existing_columns = df_final_results.columns.tolist()

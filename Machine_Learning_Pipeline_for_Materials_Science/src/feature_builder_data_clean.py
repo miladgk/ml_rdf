@@ -198,6 +198,9 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
     s2_entropy = df.get("s2_entropy_temporal", np.nan).astype(float)
     s2_entropy_avg = df.get("s2_entropy_avg_temporal", np.nan).astype(float)
     isb = df.get("isb_temporal", np.nan).astype(float)
+    csro_unlike = df.get("csro_unlike_temporal", np.nan).astype(float)
+    csro_like = df.get("csro_like_temporal", np.nan).astype(float)
+    csro_unlike_std = df.get("csro_unlike_std_temporal", np.nan).astype(float)
     gaussian_peak2 = df.get("gaussian_peak2_center", np.nan).astype(float)
     gaussian_peak3 = df.get("gaussian_peak3_center", np.nan).astype(float)
     validated_sqrt3 = df.get("validated_sqrt3_r_SG", np.nan).astype(float)
@@ -306,6 +309,9 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
         "s2_entropy_temporal": s2_entropy,
         "s2_entropy_avg_temporal": s2_entropy_avg,
         "isb_temporal": isb,
+        "csro_unlike_temporal": csro_unlike,
+        "csro_like_temporal": csro_like,
+        "csro_unlike_std_temporal": csro_unlike_std,
     })
 
     # Add neighbor columns

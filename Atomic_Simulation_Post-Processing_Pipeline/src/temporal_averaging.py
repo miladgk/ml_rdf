@@ -163,6 +163,9 @@ def perform_temporal_averaging(all_snapshots_processed_data):
     s2_entropy_avg_over_time = grouped_atoms['s2_entropy'].mean().to_dict()
     s2_entropy_avg_avg_over_time = grouped_atoms['s2_entropy_avg'].mean().to_dict()
     isb_avg_over_time = grouped_atoms['isb'].mean().to_dict()
+    csro_unlike_avg_over_time = grouped_atoms['csro_unlike'].mean().to_dict()
+    csro_like_avg_over_time = grouped_atoms['csro_like'].mean().to_dict()
+    csro_unlike_std_over_time = grouped_atoms['csro_unlike'].std().to_dict()
 
     neighbor_records = pd.DataFrame.from_records(
         atom_frame['neighbors_by_type'].apply(lambda x: dict(x) if isinstance(x, dict) else {}).tolist(),
@@ -243,6 +246,9 @@ def perform_temporal_averaging(all_snapshots_processed_data):
             averaged_entry['s2_entropy_temporal'] = s2_entropy_avg_over_time.get(atom_id, np.nan)
             averaged_entry['s2_entropy_avg_temporal'] = s2_entropy_avg_avg_over_time.get(atom_id, np.nan)
             averaged_entry['isb_temporal'] = isb_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['csro_unlike_temporal'] = csro_unlike_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['csro_like_temporal'] = csro_like_avg_over_time.get(atom_id, np.nan)
+            averaged_entry['csro_unlike_std_temporal'] = csro_unlike_std_over_time.get(atom_id, np.nan)
             final_atom_data_list.append(averaged_entry)
         else:
             logging.warning(

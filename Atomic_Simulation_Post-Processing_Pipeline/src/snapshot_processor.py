@@ -167,6 +167,46 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
         }
 
         # ----------------------------------------------------------------------
+        # Compute Warren-Cowley Chemical Short-Range Order (CSRO)
+        # ----------------------------------------------------------------------
+        # Get global composition from params
+        comp = params.get('composition', {})
+        if comp.get('compute_from_snapshot', False):
+            # Compute from actual atom counts in this snapshot
+            n_type1 = int((types == 1).sum())
+            n_type2 = int((types == 2).sum())
+            total = n_type1 + n_type2
+            x_type1 = n_type1 / total if total > 0 else 0.5
+            x_type2 = n_type2 / total if total > 0 else 0.5
+        else:
+            x_type1 = float(comp.get('type_1_fraction', 0.5))
+            x_type2 = float(comp.get('type_2_fraction', 0.5))
+        
+        csro_unlike_list = np.full(num_atoms, np.nan)
+        csro_like_list = np.full(num_atoms, np.nan)
+        
+        for atom_index in range(num_atoms):
+            atom_type = types[atom_index]
+            n1 = neighbors_by_type[ids[atom_index]].get(1, 0)
+            n2 = neighbors_by_type[ids[atom_index]].get(2, 0)
+            cn = n1 + n2
+            if cn == 0:
+                continue
+            
+            p1 = n1 / cn
+            p2 = n2 / cn
+            
+            if atom_type == 1:  # Cu atom: unlike = tendency to have Zr neighbors
+                csro_unlike = 1.0 - (p2 / x_type2) if x_type2 > 1e-10 else np.nan
+                csro_like = 1.0 - (p1 / x_type1) if x_type1 > 1e-10 else np.nan
+            else:  # Zr atom: unlike = tendency to have Cu neighbors
+                csro_unlike = 1.0 - (p1 / x_type1) if x_type1 > 1e-10 else np.nan
+                csro_like = 1.0 - (p2 / x_type2) if x_type2 > 1e-10 else np.nan
+            
+            csro_unlike_list[atom_index] = csro_unlike
+            csro_like_list[atom_index] = csro_like
+
+        # ----------------------------------------------------------------------
         # Compute local RDF gᵢ(r) in a vectorized pass.
         # ----------------------------------------------------------------------
         logging.info(f"Computing individual g_i(r) for {snapshot_file}...")
@@ -290,6 +330,8 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
                     's2_entropy': s2_list[atom_index],
                     's2_entropy_avg': s2_avg_list[atom_index],
                     'isb': isb_values[atom_index],
+                    'csro_unlike': csro_unlike_list[atom_index],
+                    'csro_like': csro_like_list[atom_index],
                 })
             else:
                 logging.warning(
