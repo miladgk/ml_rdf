@@ -201,12 +201,13 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
             s2_entropy_values[atom_id] = s2
 
         # Extract S2 per atom in order and compute neighbor-averaged version
+        # Lechner-Dellago convention: include central atom + its Voronoi neighbors
         s2_list = np.array([s2_entropy_values[atom_id] for atom_id in ids], dtype=float)
         s2_avg_list = np.copy(s2_list)
         for atom_index in range(num_atoms):
             neigh = processed_vor_neighbors[atom_index]
             if neigh:
-                neigh_s2 = s2_list[neigh]
+                neigh_s2 = np.append(s2_list[atom_index], s2_list[neigh])
                 s2_avg_list[atom_index] = np.mean(neigh_s2)
 
         # ----------------------------------------------------------------------

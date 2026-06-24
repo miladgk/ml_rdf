@@ -377,9 +377,10 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
         # Free volume: Voronoi volume minus the atomic sphere volume
         ml_df['free_volume_temporal'] = ml_df['voronoi_volume_temporal'] - ml_df['atomic_sphere_volume']
 
-        # Composition fraction: neighbor_1 / CN_temporal
+        # Composition fractions: neighbor_1/CN and neighbor_2/CN
         cn_safe = ml_df["CN_temporal"].replace(0, np.nan)
         ml_df['neighbor_1_fraction_temporal'] = ml_df['neighbor_1'] / cn_safe
+        ml_df['neighbor_2_fraction_temporal'] = ml_df['neighbor_2'] / cn_safe
         if ml_df['neighbor_1_fraction_temporal'].isna().any():
             logging.warning(f"Found {ml_df['neighbor_1_fraction_temporal'].isna().sum()} atoms with CN_temporal == 0")
 
