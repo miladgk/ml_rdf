@@ -112,8 +112,8 @@ FIT_R_MAX_FACTOR: 2.2
 # Set these to the KNOWN bulk composition for labeled systems.
 # For polyamorphous (unknown), set compute_from_snapshot: true
 composition:
-  type_1_fraction: 0.50
-  type_2_fraction: 0.50
+  type_1_fraction: 0.5
+  type_2_fraction: 0.5
   compute_from_snapshot: true
 
 # -----------------------------------------------------------------------------
