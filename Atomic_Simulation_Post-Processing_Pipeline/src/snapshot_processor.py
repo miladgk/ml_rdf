@@ -131,6 +131,78 @@ def compute_bond_angle_features(atom_pos, neighbor_positions, neighbor_types,
     return result
 
 
+def compute_neighbor_averaged_voronoi_features(atom_index, neighbor_indices,
+                                                 per_atom_features_dict):
+    """
+    Compute second-shell MRO features from per-atom feature lookup.
+    atom_index: int, index of central atom i
+    neighbor_indices: list of neighbor indices (row positions)
+    per_atom_features_dict: dict[atom_index] -> dict of per-atom features
+    """
+    if len(neighbor_indices) == 0:
+        return {k: np.nan for k in [
+            'mean_neighbor_volume', 'std_neighbor_volume',
+            'mean_neighbor_pentagon_fraction', 'std_neighbor_pentagon_fraction',
+            'mean_neighbor_CN', 'mean_neighbor_free_volume', 'mean_neighbor_asphericity'
+        ]}
+    
+    vols, pents, cns, fvs, asps = [], [], [], [], []
+    for nb_idx in neighbor_indices:
+        if nb_idx not in per_atom_features_dict:
+            continue
+        nb = per_atom_features_dict[nb_idx]
+        if not np.isnan(nb['voronoi_volume']): vols.append(nb['voronoi_volume'])
+        if not np.isnan(nb['pentagon_fraction']): pents.append(nb['pentagon_fraction'])
+        if not np.isnan(nb['num_neighbors']): cns.append(nb['num_neighbors'])
+        if not np.isnan(nb['free_volume']): fvs.append(nb['free_volume'])
+        if not np.isnan(nb['asphericity_voronoi']): asps.append(nb['asphericity_voronoi'])
+    
+    return {
+        'mean_neighbor_volume': np.mean(vols) if vols else np.nan,
+        'std_neighbor_volume': np.std(vols) if len(vols) > 1 else np.nan,
+        'mean_neighbor_pentagon_fraction': np.mean(pents) if pents else np.nan,
+        'std_neighbor_pentagon_fraction': np.std(pents) if len(pents) > 1 else np.nan,
+        'mean_neighbor_CN': np.mean(cns) if cns else np.nan,
+        'mean_neighbor_free_volume': np.mean(fvs) if fvs else np.nan,
+        'mean_neighbor_asphericity': np.mean(asps) if asps else np.nan,
+    }
+
+
+def compute_second_level_mro_features(atom_idx, first_shell_indices,
+                                           neighbor_lists_by_idx, per_atom_lookup):
+    """
+    Compute second-level MRO by averaging over neighbors of neighbors.
+    atom_idx: 0-based index of central atom
+    first_shell_indices: list of 0-based neighbor indices (first shell)
+    neighbor_lists_by_idx: dict mapping 0-based idx -> list of 0-based neighbor idxs
+    per_atom_lookup: dict mapping 0-based idx -> dict of per-atom features
+    """
+    vols, fvs, pents, cns = [], [], [], []
+    
+    for j_idx in first_shell_indices:
+        if j_idx not in neighbor_lists_by_idx:
+            continue
+        for k_idx in neighbor_lists_by_idx[j_idx]:
+            if k_idx == atom_idx:
+                continue
+            if k_idx not in per_atom_lookup:
+                continue
+            kf = per_atom_lookup[k_idx]
+            if not np.isnan(kf['voronoi_volume']): vols.append(kf['voronoi_volume'])
+            if not np.isnan(kf['free_volume']): fvs.append(kf['free_volume'])
+            if not np.isnan(kf['pentagon_fraction']): pents.append(kf['pentagon_fraction'])
+            if not np.isnan(kf['num_neighbors']): cns.append(kf['num_neighbors'])
+    
+    return {
+        'mean_2nd_neighbor_volume': np.mean(vols) if vols else np.nan,
+        'std_2nd_neighbor_volume': np.std(vols) if len(vols) > 1 else np.nan,
+        'mean_2nd_neighbor_free_volume': np.mean(fvs) if fvs else np.nan,
+        'mean_2nd_neighbor_pentagon_fraction': np.mean(pents) if pents else np.nan,
+        'mean_2nd_neighbor_CN': np.mean(cns) if cns else np.nan,
+        'n_second_shell_samples': len(vols),
+    }
+
+
 def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volumes_for_rdf_calc):
     """
     Process a single LAMMPS snapshot to compute per-atom descriptors.
@@ -445,6 +517,93 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
                     f"Atom ID {atom_id} in snapshot {snapshot_file} "
                     f"has no g_i(r) data. Excluded from results."
                 )
+
+        # ----------------------------------------------------------------------
+        # Pass 2: Compute neighbor-averaged (MRO) features
+        # ----------------------------------------------------------------------
+        logging.info(f"Computing MRO features for {snapshot_file}...")
+        
+        # Build lookup dict from atom_data (already assembled)
+        # Key by original atom_index (0-based), NOT position in atom_data,
+        # because processed_vor_neighbors uses original atom indices.
+        per_atom_lookup = {}
+        for ad in atom_data:
+            # Find the original atom_index for this atom
+            atom_id = ad['id']
+            orig_idx = id_to_idx[atom_id]
+            
+            pentagon = None
+            n5 = ad.get('n5_voronoi', 0)
+            n_sum = (ad.get('n3_voronoi', 0) + ad.get('n4_voronoi', 0) +
+                     n5 + ad.get('n6_voronoi', 0))
+            if n_sum > 0:
+                pentagon = n5 / n_sum
+            
+            # free_volume not in per-snapshot data; compute from voronoi_volume and radius
+            radius = ad.get('radius', 1.28)
+            atomic_vol = (4.0/3.0) * np.pi * (radius ** 3)
+            free_vol = ad.get('voronoi_volume', np.nan) - atomic_vol if not np.isnan(ad.get('voronoi_volume', np.nan)) else np.nan
+            
+            per_atom_lookup[orig_idx] = {
+                'voronoi_volume': ad.get('voronoi_volume', np.nan),
+                'pentagon_fraction': pentagon,
+                'num_neighbors': ad.get('num_neighbors', np.nan),
+                'free_volume': free_vol,
+                'asphericity_voronoi': ad.get('asphericity_voronoi', np.nan),
+            }
+        
+        mro_keys = ['mean_neighbor_volume', 'std_neighbor_volume',
+                    'mean_neighbor_pentagon_fraction', 'std_neighbor_pentagon_fraction',
+                    'mean_neighbor_CN', 'mean_neighbor_free_volume', 'mean_neighbor_asphericity']
+        mro_features = {k: np.full(num_atoms, np.nan) for k in mro_keys}
+        
+        for atom_index in range(num_atoms):
+            neigh = processed_vor_neighbors[atom_index]
+            result = compute_neighbor_averaged_voronoi_features(atom_index, neigh, per_atom_lookup)
+            for k in mro_keys:
+                mro_features[k][atom_index] = result[k]
+        
+        # Add MRO columns to atom_data
+        # Use original atom_index to correctly map from mro_features arrays
+        for ad in atom_data:
+            atom_id = ad['id']
+            orig_idx = id_to_idx[atom_id]
+            for k in mro_keys:
+                ad[k] = mro_features[k][orig_idx]
+        
+        logging.info(f"MRO features computed for {snapshot_file}.")
+
+        # ----------------------------------------------------------------------
+        # Pass 3: Second-level MRO (neighbors of neighbors)
+        # ----------------------------------------------------------------------
+        logging.info(f"Computing second-level MRO features for {snapshot_file}...")
+        
+        # Build neighbor lookup by 0-based index (same keys as per_atom_lookup)
+        neighbor_lists_by_idx = {
+            idx: processed_vor_neighbors[idx] for idx in range(num_atoms)
+        }
+        
+        second_mro_keys = ['mean_2nd_neighbor_volume', 'std_2nd_neighbor_volume',
+                           'mean_2nd_neighbor_free_volume', 'mean_2nd_neighbor_pentagon_fraction',
+                           'mean_2nd_neighbor_CN', 'n_second_shell_samples']
+        second_mro_features = {k: np.full(num_atoms, np.nan) for k in second_mro_keys}
+        
+        for atom_index in range(num_atoms):
+            first_shell = processed_vor_neighbors[atom_index]
+            result = compute_second_level_mro_features(
+                atom_index, first_shell, neighbor_lists_by_idx, per_atom_lookup
+            )
+            for k in second_mro_keys:
+                second_mro_features[k][atom_index] = result[k]
+        
+        # Add second-level MRO columns to atom_data
+        for ad in atom_data:
+            atom_id = ad['id']
+            orig_idx = id_to_idx[atom_id]
+            for k in second_mro_keys:
+                ad[k] = second_mro_features[k][orig_idx]
+        
+        logging.info(f"Second-level MRO features computed for {snapshot_file}.")
 
         # ----------------------------------------------------------------------
         # Snapshot metadata

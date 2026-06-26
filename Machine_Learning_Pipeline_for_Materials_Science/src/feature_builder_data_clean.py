@@ -201,6 +201,18 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
     csro_unlike = df.get("csro_unlike_temporal", np.nan).astype(float)
     csro_like = df.get("csro_like_temporal", np.nan).astype(float)
     csro_unlike_std = df.get("csro_unlike_std_temporal", np.nan).astype(float)
+    mean_neighbor_volume = df.get("mean_neighbor_volume_temporal", np.nan).astype(float)
+    std_neighbor_volume = df.get("std_neighbor_volume_temporal", np.nan).astype(float)
+    mean_neighbor_pentagon_fraction = df.get("mean_neighbor_pentagon_fraction_temporal", np.nan).astype(float)
+    std_neighbor_pentagon_fraction = df.get("std_neighbor_pentagon_fraction_temporal", np.nan).astype(float)
+    mean_neighbor_CN = df.get("mean_neighbor_CN_temporal", np.nan).astype(float)
+    mean_neighbor_free_volume = df.get("mean_neighbor_free_volume_temporal", np.nan).astype(float)
+    mean_neighbor_asphericity = df.get("mean_neighbor_asphericity_temporal", np.nan).astype(float)
+    mean_2nd_neighbor_volume = df.get("mean_2nd_neighbor_volume_temporal", np.nan).astype(float)
+    std_2nd_neighbor_volume = df.get("std_2nd_neighbor_volume_temporal", np.nan).astype(float)
+    mean_2nd_neighbor_free_volume = df.get("mean_2nd_neighbor_free_volume_temporal", np.nan).astype(float)
+    mean_2nd_neighbor_pentagon_fraction = df.get("mean_2nd_neighbor_pentagon_fraction_temporal", np.nan).astype(float)
+    mean_2nd_neighbor_CN = df.get("mean_2nd_neighbor_CN_temporal", np.nan).astype(float)
     mean_angle_all = df.get("mean_angle_all_temporal", np.nan).astype(float)
     std_angle_all = df.get("std_angle_all_temporal", np.nan).astype(float)
     skewness_angle_all = df.get("skewness_angle_all_temporal", np.nan).astype(float)
@@ -318,6 +330,18 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
         "csro_unlike_temporal": csro_unlike,
         "csro_like_temporal": csro_like,
         "csro_unlike_std_temporal": csro_unlike_std,
+        "mean_neighbor_volume_temporal": mean_neighbor_volume,
+        "std_neighbor_volume_temporal": std_neighbor_volume,
+        "mean_neighbor_pentagon_fraction_temporal": mean_neighbor_pentagon_fraction,
+        "std_neighbor_pentagon_fraction_temporal": std_neighbor_pentagon_fraction,
+        "mean_neighbor_CN_temporal": mean_neighbor_CN,
+        "mean_neighbor_free_volume_temporal": mean_neighbor_free_volume,
+        "mean_neighbor_asphericity_temporal": mean_neighbor_asphericity,
+        "mean_2nd_neighbor_volume_temporal": mean_2nd_neighbor_volume,
+        "std_2nd_neighbor_volume_temporal": std_2nd_neighbor_volume,
+        "mean_2nd_neighbor_free_volume_temporal": mean_2nd_neighbor_free_volume,
+        "mean_2nd_neighbor_pentagon_fraction_temporal": mean_2nd_neighbor_pentagon_fraction,
+        "mean_2nd_neighbor_CN_temporal": mean_2nd_neighbor_CN,
         "mean_angle_all_temporal": mean_angle_all,
         "std_angle_all_temporal": std_angle_all,
         "skewness_angle_all_temporal": skewness_angle_all,
