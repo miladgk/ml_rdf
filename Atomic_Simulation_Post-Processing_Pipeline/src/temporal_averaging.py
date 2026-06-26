@@ -175,6 +175,11 @@ def perform_temporal_averaging(all_snapshots_processed_data):
     mean_2nd_neighbor_free_volume_avg = grouped_atoms['mean_2nd_neighbor_free_volume'].mean().to_dict()
     mean_2nd_neighbor_pentagon_fraction_avg = grouped_atoms['mean_2nd_neighbor_pentagon_fraction'].mean().to_dict()
     mean_2nd_neighbor_CN_avg = grouped_atoms['mean_2nd_neighbor_CN'].mean().to_dict()
+    mean_3rd_neighbor_volume_avg = grouped_atoms['mean_3rd_neighbor_volume'].mean().to_dict() if 'mean_3rd_neighbor_volume' in atom_frame.columns else {}
+    std_3rd_neighbor_volume_avg = grouped_atoms['std_3rd_neighbor_volume'].mean().to_dict() if 'std_3rd_neighbor_volume' in atom_frame.columns else {}
+    mean_3rd_neighbor_free_volume_avg = grouped_atoms['mean_3rd_neighbor_free_volume'].mean().to_dict() if 'mean_3rd_neighbor_free_volume' in atom_frame.columns else {}
+    mean_3rd_neighbor_pentagon_fraction_avg = grouped_atoms['mean_3rd_neighbor_pentagon_fraction'].mean().to_dict() if 'mean_3rd_neighbor_pentagon_fraction' in atom_frame.columns else {}
+    mean_3rd_neighbor_CN_avg = grouped_atoms['mean_3rd_neighbor_CN'].mean().to_dict() if 'mean_3rd_neighbor_CN' in atom_frame.columns else {}
     csro_unlike_avg_over_time = grouped_atoms['csro_unlike'].mean().to_dict()
     csro_like_avg_over_time = grouped_atoms['csro_like'].mean().to_dict()
     csro_unlike_std_over_time = grouped_atoms['csro_unlike'].std().to_dict()
@@ -276,6 +281,11 @@ def perform_temporal_averaging(all_snapshots_processed_data):
             averaged_entry['mean_2nd_neighbor_free_volume_temporal'] = mean_2nd_neighbor_free_volume_avg.get(atom_id, np.nan)
             averaged_entry['mean_2nd_neighbor_pentagon_fraction_temporal'] = mean_2nd_neighbor_pentagon_fraction_avg.get(atom_id, np.nan)
             averaged_entry['mean_2nd_neighbor_CN_temporal'] = mean_2nd_neighbor_CN_avg.get(atom_id, np.nan)
+            averaged_entry['mean_3rd_neighbor_volume_temporal'] = mean_3rd_neighbor_volume_avg.get(atom_id, np.nan)
+            averaged_entry['std_3rd_neighbor_volume_temporal'] = std_3rd_neighbor_volume_avg.get(atom_id, np.nan)
+            averaged_entry['mean_3rd_neighbor_free_volume_temporal'] = mean_3rd_neighbor_free_volume_avg.get(atom_id, np.nan)
+            averaged_entry['mean_3rd_neighbor_pentagon_fraction_temporal'] = mean_3rd_neighbor_pentagon_fraction_avg.get(atom_id, np.nan)
+            averaged_entry['mean_3rd_neighbor_CN_temporal'] = mean_3rd_neighbor_CN_avg.get(atom_id, np.nan)
             averaged_entry['csro_unlike_temporal'] = csro_unlike_avg_over_time.get(atom_id, np.nan)
             averaged_entry['csro_like_temporal'] = csro_like_avg_over_time.get(atom_id, np.nan)
             averaged_entry['csro_unlike_std_temporal'] = csro_unlike_std_over_time.get(atom_id, np.nan)

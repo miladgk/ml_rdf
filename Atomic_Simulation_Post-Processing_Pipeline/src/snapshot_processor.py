@@ -203,6 +203,48 @@ def compute_second_level_mro_features(atom_idx, first_shell_indices,
     }
 
 
+def compute_third_level_mro_features(atom_idx, first_shell_indices,
+                                     neighbor_lists_by_idx, per_atom_lookup):
+    """
+    Compute third-level MRO by averaging over neighbors of neighbors of neighbors (3rd shell).
+    """
+    vols, fvs, pents, cns = [], [], [], []
+    
+    # Identify 1st and 2nd shell atoms to exclude them
+    visited = set(first_shell_indices)
+    visited.add(atom_idx)
+    second_shell = set()
+    for j_idx in first_shell_indices:
+        if j_idx in neighbor_lists_by_idx:
+            for k_idx in neighbor_lists_by_idx[j_idx]:
+                if k_idx not in visited:
+                    second_shell.add(k_idx)
+                    visited.add(k_idx)
+                    
+    for k_idx in second_shell:
+        if k_idx not in neighbor_lists_by_idx:
+            continue
+        for m_idx in neighbor_lists_by_idx[k_idx]:
+            if m_idx in visited:
+                continue
+            if m_idx not in per_atom_lookup:
+                continue
+            mf = per_atom_lookup[m_idx]
+            if not np.isnan(mf['voronoi_volume']): vols.append(mf['voronoi_volume'])
+            if not np.isnan(mf['free_volume']): fvs.append(mf['free_volume'])
+            if not np.isnan(mf['pentagon_fraction']): pents.append(mf['pentagon_fraction'])
+            if not np.isnan(mf['num_neighbors']): cns.append(mf['num_neighbors'])
+            
+    return {
+        'mean_3rd_neighbor_volume': np.mean(vols) if vols else np.nan,
+        'std_3rd_neighbor_volume': np.std(vols) if len(vols) > 1 else np.nan,
+        'mean_3rd_neighbor_free_volume': np.mean(fvs) if fvs else np.nan,
+        'mean_3rd_neighbor_pentagon_fraction': np.mean(pents) if pents else np.nan,
+        'mean_3rd_neighbor_CN': np.mean(cns) if cns else np.nan,
+        'n_third_shell_samples': len(vols),
+    }
+
+
 def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volumes_for_rdf_calc):
     """
     Process a single LAMMPS snapshot to compute per-atom descriptors.
@@ -293,12 +335,13 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
         id_to_idx = {atom_id: idx for idx, atom_id in enumerate(ids)}
 
         # Convert Voronoi neighbor IDs to 0-based indices
+        # NOTE: freud/pyvoro return adjacent_cell as 0-based array indices already
         processed_vor_neighbors = []
         for cell in voronoi_cells:
             neighbors_for_atom = [
-                id_to_idx[face['adjacent_cell']]
+                int(face['adjacent_cell'])
                 for face in cell['faces']
-                if face['adjacent_cell'] > 0 and face['adjacent_cell'] in id_to_idx
+                if face['adjacent_cell'] >= 0 and int(face['adjacent_cell']) < num_atoms
             ]
             processed_vor_neighbors.append(neighbors_for_atom)
 
@@ -574,36 +617,74 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
         logging.info(f"MRO features computed for {snapshot_file}.")
 
         # ----------------------------------------------------------------------
-        # Pass 3: Second-level MRO (neighbors of neighbors)
+        # Pass 3: Second-level MRO (neighbors of neighbors) - Configurable
         # ----------------------------------------------------------------------
-        logging.info(f"Computing second-level MRO features for {snapshot_file}...")
-        
-        # Build neighbor lookup by 0-based index (same keys as per_atom_lookup)
-        neighbor_lists_by_idx = {
-            idx: processed_vor_neighbors[idx] for idx in range(num_atoms)
-        }
-        
+        mro_depth = params.get('MRO_DEPTH', 2)
         second_mro_keys = ['mean_2nd_neighbor_volume', 'std_2nd_neighbor_volume',
                            'mean_2nd_neighbor_free_volume', 'mean_2nd_neighbor_pentagon_fraction',
                            'mean_2nd_neighbor_CN', 'n_second_shell_samples']
-        second_mro_features = {k: np.full(num_atoms, np.nan) for k in second_mro_keys}
         
-        for atom_index in range(num_atoms):
-            first_shell = processed_vor_neighbors[atom_index]
-            result = compute_second_level_mro_features(
-                atom_index, first_shell, neighbor_lists_by_idx, per_atom_lookup
-            )
-            for k in second_mro_keys:
-                second_mro_features[k][atom_index] = result[k]
+        if mro_depth >= 2 and params.get('COMPUTE_SECOND_LEVEL_MRO', True):
+            logging.info(f"Computing second-level MRO features for {snapshot_file} (MRO_DEPTH={mro_depth})...")
+            neighbor_lists_by_idx = {
+                idx: processed_vor_neighbors[idx] for idx in range(num_atoms)
+            }
+            second_mro_features = {k: np.full(num_atoms, np.nan) for k in second_mro_keys}
+            
+            for atom_index in range(num_atoms):
+                first_shell = processed_vor_neighbors[atom_index]
+                result = compute_second_level_mro_features(
+                    atom_index, first_shell, neighbor_lists_by_idx, per_atom_lookup
+                )
+                for k in second_mro_keys:
+                    second_mro_features[k][atom_index] = result[k]
+            
+            for ad in atom_data:
+                atom_id = ad['id']
+                orig_idx = id_to_idx[atom_id]
+                for k in second_mro_keys:
+                    ad[k] = second_mro_features[k][orig_idx]
+            
+            logging.info(f"Second-level MRO features computed for {snapshot_file}.")
+        else:
+            logging.info(f"Skipping second-level MRO computation (MRO_DEPTH={mro_depth}). Filling with NaN.")
+            for ad in atom_data:
+                for k in second_mro_keys:
+                    ad[k] = np.nan
+
+        # ----------------------------------------------------------------------
+        # Pass 4: Third-level MRO (3rd shell neighbors) - Configurable
+        # ----------------------------------------------------------------------
+        third_mro_keys = ['mean_3rd_neighbor_volume', 'std_3rd_neighbor_volume',
+                          'mean_3rd_neighbor_free_volume', 'mean_3rd_neighbor_pentagon_fraction',
+                          'mean_3rd_neighbor_CN', 'n_third_shell_samples']
         
-        # Add second-level MRO columns to atom_data
-        for ad in atom_data:
-            atom_id = ad['id']
-            orig_idx = id_to_idx[atom_id]
-            for k in second_mro_keys:
-                ad[k] = second_mro_features[k][orig_idx]
-        
-        logging.info(f"Second-level MRO features computed for {snapshot_file}.")
+        if mro_depth >= 3:
+            logging.info(f"Computing third-level MRO features for {snapshot_file} (MRO_DEPTH={mro_depth})...")
+            if 'neighbor_lists_by_idx' not in locals():
+                neighbor_lists_by_idx = {
+                    idx: processed_vor_neighbors[idx] for idx in range(num_atoms)
+                }
+            third_mro_features = {k: np.full(num_atoms, np.nan) for k in third_mro_keys}
+            
+            for atom_index in range(num_atoms):
+                first_shell = processed_vor_neighbors[atom_index]
+                result = compute_third_level_mro_features(
+                    atom_index, first_shell, neighbor_lists_by_idx, per_atom_lookup
+                )
+                for k in third_mro_keys:
+                    third_mro_features[k][atom_index] = result[k]
+                    
+            for ad in atom_data:
+                atom_id = ad['id']
+                orig_idx = id_to_idx[atom_id]
+                for k in third_mro_keys:
+                    ad[k] = third_mro_features[k][orig_idx]
+            logging.info(f"Third-level MRO features computed for {snapshot_file}.")
+        else:
+            for ad in atom_data:
+                for k in third_mro_keys:
+                    ad[k] = np.nan
 
         # ----------------------------------------------------------------------
         # Snapshot metadata

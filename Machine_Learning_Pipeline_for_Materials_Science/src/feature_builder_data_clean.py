@@ -213,6 +213,11 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
     mean_2nd_neighbor_free_volume = df.get("mean_2nd_neighbor_free_volume_temporal", np.nan).astype(float)
     mean_2nd_neighbor_pentagon_fraction = df.get("mean_2nd_neighbor_pentagon_fraction_temporal", np.nan).astype(float)
     mean_2nd_neighbor_CN = df.get("mean_2nd_neighbor_CN_temporal", np.nan).astype(float)
+    mean_3rd_neighbor_volume = df.get("mean_3rd_neighbor_volume_temporal", np.nan).astype(float)
+    std_3rd_neighbor_volume = df.get("std_3rd_neighbor_volume_temporal", np.nan).astype(float)
+    mean_3rd_neighbor_free_volume = df.get("mean_3rd_neighbor_free_volume_temporal", np.nan).astype(float)
+    mean_3rd_neighbor_pentagon_fraction = df.get("mean_3rd_neighbor_pentagon_fraction_temporal", np.nan).astype(float)
+    mean_3rd_neighbor_CN = df.get("mean_3rd_neighbor_CN_temporal", np.nan).astype(float)
     mean_angle_all = df.get("mean_angle_all_temporal", np.nan).astype(float)
     std_angle_all = df.get("std_angle_all_temporal", np.nan).astype(float)
     skewness_angle_all = df.get("skewness_angle_all_temporal", np.nan).astype(float)
@@ -342,6 +347,11 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
         "mean_2nd_neighbor_free_volume_temporal": mean_2nd_neighbor_free_volume,
         "mean_2nd_neighbor_pentagon_fraction_temporal": mean_2nd_neighbor_pentagon_fraction,
         "mean_2nd_neighbor_CN_temporal": mean_2nd_neighbor_CN,
+        "mean_3rd_neighbor_volume_temporal": mean_3rd_neighbor_volume,
+        "std_3rd_neighbor_volume_temporal": std_3rd_neighbor_volume,
+        "mean_3rd_neighbor_free_volume_temporal": mean_3rd_neighbor_free_volume,
+        "mean_3rd_neighbor_pentagon_fraction_temporal": mean_3rd_neighbor_pentagon_fraction,
+        "mean_3rd_neighbor_CN_temporal": mean_3rd_neighbor_CN,
         "mean_angle_all_temporal": mean_angle_all,
         "std_angle_all_temporal": std_angle_all,
         "skewness_angle_all_temporal": skewness_angle_all,
@@ -433,7 +443,10 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
         # Add to fill_cols for per-type median imputation
         extra_fill = ['free_volume_temporal',
                       'neighbor_1_fraction_temporal', 'volume_q6_interaction',
-                      'volume_per_neighbor']
+                      'volume_per_neighbor',
+                      'mean_3rd_neighbor_volume_temporal', 'std_3rd_neighbor_volume_temporal',
+                      'mean_3rd_neighbor_free_volume_temporal', 'mean_3rd_neighbor_pentagon_fraction_temporal',
+                      'mean_3rd_neighbor_CN_temporal']
         fill_cols.extend(extra_fill)
         ml_df[extra_fill] = ml_df.groupby("type")[extra_fill].transform(lambda x: x.fillna(x.median()))
 
