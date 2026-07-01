@@ -213,11 +213,15 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
     mean_2nd_neighbor_free_volume = df.get("mean_2nd_neighbor_free_volume_temporal", np.nan).astype(float)
     mean_2nd_neighbor_pentagon_fraction = df.get("mean_2nd_neighbor_pentagon_fraction_temporal", np.nan).astype(float)
     mean_2nd_neighbor_CN = df.get("mean_2nd_neighbor_CN_temporal", np.nan).astype(float)
+    cu_fraction_2nd_shell = df.get("cu_fraction_2nd_shell_temporal", np.nan).astype(float)
+    zr_fraction_2nd_shell = df.get("zr_fraction_2nd_shell_temporal", np.nan).astype(float)
     mean_3rd_neighbor_volume = df.get("mean_3rd_neighbor_volume_temporal", np.nan).astype(float)
     std_3rd_neighbor_volume = df.get("std_3rd_neighbor_volume_temporal", np.nan).astype(float)
     mean_3rd_neighbor_free_volume = df.get("mean_3rd_neighbor_free_volume_temporal", np.nan).astype(float)
     mean_3rd_neighbor_pentagon_fraction = df.get("mean_3rd_neighbor_pentagon_fraction_temporal", np.nan).astype(float)
     mean_3rd_neighbor_CN = df.get("mean_3rd_neighbor_CN_temporal", np.nan).astype(float)
+    cu_fraction_3rd_shell = df.get("cu_fraction_3rd_shell_temporal", np.nan).astype(float)
+    zr_fraction_3rd_shell = df.get("zr_fraction_3rd_shell_temporal", np.nan).astype(float)
     mean_angle_all = df.get("mean_angle_all_temporal", np.nan).astype(float)
     std_angle_all = df.get("std_angle_all_temporal", np.nan).astype(float)
     skewness_angle_all = df.get("skewness_angle_all_temporal", np.nan).astype(float)
@@ -347,11 +351,15 @@ def build_ml_table(input_csv: str, tolerance: float = 0.1, atomic_radii: dict = 
         "mean_2nd_neighbor_free_volume_temporal": mean_2nd_neighbor_free_volume,
         "mean_2nd_neighbor_pentagon_fraction_temporal": mean_2nd_neighbor_pentagon_fraction,
         "mean_2nd_neighbor_CN_temporal": mean_2nd_neighbor_CN,
+        "cu_fraction_2nd_shell_temporal": cu_fraction_2nd_shell,
+        "zr_fraction_2nd_shell_temporal": zr_fraction_2nd_shell,
         "mean_3rd_neighbor_volume_temporal": mean_3rd_neighbor_volume,
         "std_3rd_neighbor_volume_temporal": std_3rd_neighbor_volume,
         "mean_3rd_neighbor_free_volume_temporal": mean_3rd_neighbor_free_volume,
         "mean_3rd_neighbor_pentagon_fraction_temporal": mean_3rd_neighbor_pentagon_fraction,
         "mean_3rd_neighbor_CN_temporal": mean_3rd_neighbor_CN,
+        "cu_fraction_3rd_shell_temporal": cu_fraction_3rd_shell,
+        "zr_fraction_3rd_shell_temporal": zr_fraction_3rd_shell,
         "mean_angle_all_temporal": mean_angle_all,
         "std_angle_all_temporal": std_angle_all,
         "skewness_angle_all_temporal": skewness_angle_all,

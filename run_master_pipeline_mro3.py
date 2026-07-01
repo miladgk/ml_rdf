@@ -19,7 +19,7 @@ cfg["MRO_DEPTH"] = 3
 cfg["COMPUTE_SECOND_LEVEL_MRO"] = True
 
 # Step 1: Extract snapshots & temporal averaging for each amorphous box + polyamorphous box
-print("\n[Step 1/4] Extracting atomistic features (MRO Level 3) across all folders...")
+print("\n[Step 1/4] Extracting atomistic features (MRO Level 3 & Chemical MRO) across all folders...")
 for ds in datasets:
     target_csv = f"Atomic_Simulation_Post-Processing_Pipeline/outputs/features_{ds}.csv"
     if os.path.exists(target_csv):
@@ -72,6 +72,28 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 df_0 = pd.read_csv('Machine_Learning_Pipeline_for_Materials_Science/data/features_5050.csv')
 df_1 = pd.read_csv('Machine_Learning_Pipeline_for_Materials_Science/data/features_4654.csv')
 df_2 = pd.read_csv('Machine_Learning_Pipeline_for_Materials_Science/data/features_6436.csv')
+
+chem_cols = ['cu_fraction_2nd_shell_temporal', 'zr_fraction_2nd_shell_temporal',
+             'cu_fraction_3rd_shell_temporal', 'zr_fraction_3rd_shell_temporal']
+
+for phase_name, df_phase, expected_cu in [('5050', df_0, 0.50), ('4654', df_1, 0.46), ('6436', df_2, 0.64)]:
+    print(f"\n=== {phase_name} (expected Cu={expected_cu}) ===")
+    for col in chem_cols:
+        if col in df_phase:
+            print(f"  {col}: mean={df_phase[col].mean():.4f}, std={df_phase[col].std():.4f}")
+
+for col in ['cu_fraction_2nd_shell_temporal', 'cu_fraction_3rd_shell_temporal']:
+    if col in df_0 and col in df_1:
+        v5050 = df_0[col]
+        v4654 = df_1[col]
+        q5 = v4654.quantile(0.05)
+        q95 = v4654.quantile(0.95)
+        overlap = ((v5050 >= q5) & (v5050 <= q95)).mean()
+        print(f"\n{col}:")
+        print(f"  5050 mean={v5050.mean():.4f}, std={v5050.std():.4f}")
+        print(f"  4654 mean={v4654.mean():.4f}, std={v4654.std():.4f}")
+        print(f"  Signal (difference in means): {abs(v5050.mean()-v4654.mean()):.4f}")
+        print(f"  Overlap fraction: {overlap:.3f}")
 
 df_0['phase_label'] = 0
 df_1['phase_label'] = 1
@@ -166,3 +188,12 @@ with open(out_dump, 'w') as out:
         out.write(f"{line_str} {raw_preds[arr_idx]} {smooth_preds[arr_idx]} {smooth_conf[arr_idx]:.4f} {y_true[arr_idx]}\n")
 
 print(f"\nSUCCESS! Exported complete validated trajectory to {out_dump}")
+
+low_conf_mask = (smooth_conf > 0.50) & (smooth_conf < 0.70)
+low_conf_x = dump_df.loc[low_conf_mask, 'x'].astype(float)
+print(f"\nLow-confidence atoms (0.50-0.70): {len(low_conf_x)}")
+if len(low_conf_x) > 0:
+    print(f"x distribution: mean={low_conf_x.mean():.1f}, std={low_conf_x.std():.1f}")
+    print(f"x percentiles: 10th={low_conf_x.quantile(0.10):.1f}, "
+          f"50th={low_conf_x.quantile(0.50):.1f}, "
+          f"90th={low_conf_x.quantile(0.90):.1f}")

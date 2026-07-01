@@ -177,7 +177,7 @@ def compute_second_level_mro_features(atom_idx, first_shell_indices,
     neighbor_lists_by_idx: dict mapping 0-based idx -> list of 0-based neighbor idxs
     per_atom_lookup: dict mapping 0-based idx -> dict of per-atom features
     """
-    vols, fvs, pents, cns = [], [], [], []
+    vols, fvs, pents, cns, types = [], [], [], [], []
     
     for j_idx in first_shell_indices:
         if j_idx not in neighbor_lists_by_idx:
@@ -192,7 +192,9 @@ def compute_second_level_mro_features(atom_idx, first_shell_indices,
             if not np.isnan(kf['free_volume']): fvs.append(kf['free_volume'])
             if not np.isnan(kf['pentagon_fraction']): pents.append(kf['pentagon_fraction'])
             if not np.isnan(kf['num_neighbors']): cns.append(kf['num_neighbors'])
+            if 'type' in kf and kf['type'] is not None: types.append(kf['type'])
     
+    second_arr = np.array(types) if types else np.array([])
     return {
         'mean_2nd_neighbor_volume': np.mean(vols) if vols else np.nan,
         'std_2nd_neighbor_volume': np.std(vols) if len(vols) > 1 else np.nan,
@@ -200,6 +202,9 @@ def compute_second_level_mro_features(atom_idx, first_shell_indices,
         'mean_2nd_neighbor_pentagon_fraction': np.mean(pents) if pents else np.nan,
         'mean_2nd_neighbor_CN': np.mean(cns) if cns else np.nan,
         'n_second_shell_samples': len(vols),
+        'cu_fraction_2nd_shell': (second_arr == 1).mean() if len(second_arr) > 0 else np.nan,
+        'zr_fraction_2nd_shell': (second_arr == 2).mean() if len(second_arr) > 0 else np.nan,
+        'n_2nd_shell_chemical': len(second_arr),
     }
 
 
@@ -208,7 +213,7 @@ def compute_third_level_mro_features(atom_idx, first_shell_indices,
     """
     Compute third-level MRO by averaging over neighbors of neighbors of neighbors (3rd shell).
     """
-    vols, fvs, pents, cns = [], [], [], []
+    vols, fvs, pents, cns, types = [], [], [], [], []
     
     # Identify 1st and 2nd shell atoms to exclude them
     visited = set(first_shell_indices)
@@ -234,7 +239,9 @@ def compute_third_level_mro_features(atom_idx, first_shell_indices,
             if not np.isnan(mf['free_volume']): fvs.append(mf['free_volume'])
             if not np.isnan(mf['pentagon_fraction']): pents.append(mf['pentagon_fraction'])
             if not np.isnan(mf['num_neighbors']): cns.append(mf['num_neighbors'])
+            if 'type' in mf and mf['type'] is not None: types.append(mf['type'])
             
+    third_arr = np.array(types) if types else np.array([])
     return {
         'mean_3rd_neighbor_volume': np.mean(vols) if vols else np.nan,
         'std_3rd_neighbor_volume': np.std(vols) if len(vols) > 1 else np.nan,
@@ -242,6 +249,9 @@ def compute_third_level_mro_features(atom_idx, first_shell_indices,
         'mean_3rd_neighbor_pentagon_fraction': np.mean(pents) if pents else np.nan,
         'mean_3rd_neighbor_CN': np.mean(cns) if cns else np.nan,
         'n_third_shell_samples': len(vols),
+        'cu_fraction_3rd_shell': (third_arr == 1).mean() if len(third_arr) > 0 else np.nan,
+        'zr_fraction_3rd_shell': (third_arr == 2).mean() if len(third_arr) > 0 else np.nan,
+        'n_3rd_shell_chemical': len(third_arr),
     }
 
 
@@ -593,6 +603,7 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
                 'num_neighbors': ad.get('num_neighbors', np.nan),
                 'free_volume': free_vol,
                 'asphericity_voronoi': ad.get('asphericity_voronoi', np.nan),
+                'type': ad.get('type'),
             }
         
         mro_keys = ['mean_neighbor_volume', 'std_neighbor_volume',
@@ -622,7 +633,8 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
         mro_depth = params.get('MRO_DEPTH', 2)
         second_mro_keys = ['mean_2nd_neighbor_volume', 'std_2nd_neighbor_volume',
                            'mean_2nd_neighbor_free_volume', 'mean_2nd_neighbor_pentagon_fraction',
-                           'mean_2nd_neighbor_CN', 'n_second_shell_samples']
+                           'mean_2nd_neighbor_CN', 'n_second_shell_samples',
+                           'cu_fraction_2nd_shell', 'zr_fraction_2nd_shell', 'n_2nd_shell_chemical']
         
         if mro_depth >= 2 and params.get('COMPUTE_SECOND_LEVEL_MRO', True):
             logging.info(f"Computing second-level MRO features for {snapshot_file} (MRO_DEPTH={mro_depth})...")
@@ -657,7 +669,8 @@ def process_single_snapshot(snapshot_file, params, bins_for_rdf_calc, bin_volume
         # ----------------------------------------------------------------------
         third_mro_keys = ['mean_3rd_neighbor_volume', 'std_3rd_neighbor_volume',
                           'mean_3rd_neighbor_free_volume', 'mean_3rd_neighbor_pentagon_fraction',
-                          'mean_3rd_neighbor_CN', 'n_third_shell_samples']
+                          'mean_3rd_neighbor_CN', 'n_third_shell_samples',
+                          'cu_fraction_3rd_shell', 'zr_fraction_3rd_shell', 'n_3rd_shell_chemical']
         
         if mro_depth >= 3:
             logging.info(f"Computing third-level MRO features for {snapshot_file} (MRO_DEPTH={mro_depth})...")
