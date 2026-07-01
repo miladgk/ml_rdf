@@ -4,6 +4,8 @@ This project provides a complete, production-ready machine learning pipeline for
 
 The pipeline is optimized for speed: **full training runs in ~5 minutes with 0.854 CV score**, compared to ~28 minutes in the original version.
 
+Beyond the core pipeline, this project includes a comprehensive set of **experiment scripts** that explore advanced classification strategies: calibrated models, domain-robust feature selection, hybrid 2-stage approaches, MRO-boosted training, and spatial kernel smoothing for polyamorphous phase detection.
+
 ---
 
 ## Table of Contents
@@ -59,16 +61,36 @@ The pipeline is optimized for speed: **full training runs in ~5 minutes with 0.8
 
 ## Project File Descriptions 📂
 
+### Core Pipeline Modules (`src/`)
+
 | File | Description |
 |------|-------------|
-| `src/pipeline.py` | Main entry point. Loads data, splits by group, trains all configured models via `RandomizedSearchCV`, evaluates the best model, runs explainability (permutation importance + SHAP), and saves outputs. |
-| `src/models.py` | Constructs scikit-learn pipelines with preprocessing (imputation + scaling), `RandomizedSearchCV` with StratifiedKFold, parameter validation, and model save/load via joblib. Includes `build_cached_preprocessing_pipeline()` for pre-transformed data. |
-| `src/explainability.py` | Utilities for model interpretability: permutation feature importance, SHAP analysis (tree-based and kernel-based), top-k feature bar plots, mapping transformed features back to original names, and stratified background sampling. |
-| `src/data_utils.py` | Data preparation: load/validate CSVs, attach phase labels and group IDs, ensure required columns, perform group-aware stratified train/test splits for 2-group datasets, save predictions to CSV. |
-| `src/feature_builder_data_clean.py` | Processes atomic-level CSV data into ML-ready feature tables. Extracts interatomic distance peaks (sqrt3, sqrt4, sqrt7, sqrt12), peak-to-R1 ratios, Voronoi volumes, coordination numbers, Q4/Q6 order parameters, neighbor statistics, and derived interaction features. Numba-accelerated peak matching. |
-| `src/apply_model_to_unlabeled.py` | Applies a saved pipeline to unlabeled data, producing annotated CSVs with predicted phase labels and probabilities. |
-| `src/analyze_feature_importance.py` | Standalone script that loads saved SHAP values and prints ranked feature importance — run after pipeline completes. |
-| `config.yaml` | Central configuration file defining datasets, selected features, models, hyperparameter search spaces, splitting strategies, and output paths. |
+| `pipeline.py` | Main entry point. Loads data, splits by group, trains all configured models via `RandomizedSearchCV`, evaluates the best model, runs explainability (permutation importance + SHAP), and saves outputs. |
+| `models.py` | Constructs scikit-learn pipelines with preprocessing (imputation + scaling), `RandomizedSearchCV` with StratifiedKFold, parameter validation, and model save/load via joblib. Includes `build_cached_preprocessing_pipeline()` for pre-transformed data. |
+| `explainability.py` | Utilities for model interpretability: permutation feature importance, SHAP analysis (tree-based and kernel-based), top-k feature bar plots, mapping transformed features back to original names, and stratified background sampling. |
+| `data_utils.py` | Data preparation: load/validate CSVs, attach phase labels and group IDs, ensure required columns, perform group-aware stratified train/test splits for 2-group datasets, save predictions to CSV. |
+| `feature_builder_data_clean.py` | Processes atomic-level CSV data into ML-ready feature tables. Extracts interatomic distance peaks (sqrt3, sqrt4, sqrt7, sqrt12), peak-to-R1 ratios, Voronoi volumes, coordination numbers, Q4/Q6 order parameters, neighbor statistics, and derived interaction features. Numba-accelerated peak matching. |
+| `apply_model_to_unlabeled.py` | Applies a saved pipeline to unlabeled data, producing annotated CSVs with predicted phase labels and probabilities. |
+| `analyze_feature_importance.py` | Standalone script that loads saved SHAP values and prints ranked feature importance — run after pipeline completes. |
+
+### Experiment & Validation Scripts (`src/`)
+
+| File | Description |
+|------|-------------|
+| `retrain_calibrated.py` | Retrains the 3-class model with probability calibration (`CalibratedClassifierCV`), class weighting, and feature importance analysis with domain-shift awareness. Generates labeled LAMMPS dumps at multiple thresholds. |
+| `retrain_domain_robust.py` | Trains using only per-atom local features (voronoi_volume, R1, pentagon_fraction, q4, q6) that preserve their phase signature in polyamorphous systems. Addresses domain shift in MRO and composition features. |
+| `retrain_hybrid.py` | 2-stage hybrid approach: combines per-atom ML classification with composition-aware spatial assignment. Stage 1: binary classifier to detect 6436 vs others. Stage 2: ternary classifier on non-6436 atoms. |
+| `train_3class_mro.py` | 3-class retraining with MRO features, including grid search and comprehensive evaluation across all datasets. |
+| `train_3class_fast.py` | Fast 3-class retraining with MRO features (no grid search). Rebuilds ML tables and trains a HistGB classifier. |
+| `train_mro_retrain.py` | Retrains models with MRO features, comparing performance with and without MRO descriptors. |
+| `run_full_pipeline.py` | End-to-end pipeline: rebuilds feature tables, trains binary model, runs diagnostics, and evaluates on polyamorphous data. |
+| `run_final_solution.py` | Final solution script: builds ML tables, trains a HistGB classifier, applies to polyamorphous data, and generates labeled LAMMPS dumps. |
+| `apply_spatial_kernel_smoothing.py` | Applies spatial kernel smoothing to model predictions using neighbor averaging, producing smoothed phase labels for visualization in OVITO. |
+| `diagnose_polyamorphous.py` | Comprehensive diagnostic script for polyamorphous phase classification: composition profiles, model probability profiles, feature domain shift analysis, and per-region feature distributions. |
+| `final_validation_mro2.py` | Complete validation of second-level MRO features: rebuilds ML tables, trains models, and evaluates on all datasets including polyamorphous. |
+| `final_validation_mro2_fixed.py` | Corrected version of MRO2 validation with proper box bounds and output paths. |
+| `generate_all_thresholds.py` | Generates labeled LAMMPS files at multiple confidence thresholds for visual inspection in OVITO. |
+| `generate_correct_labeled_dump.py` | Generates correctly aligned labeled LAMMPS dump files from prediction CSVs. |
 
 ### Data Files (in `data/`)
 
@@ -174,6 +196,34 @@ python src/feature_builder_data_clean.py
 ```
 
 Processes atomic simulation CSV output and generates an ML-ready feature table with peak positions, ratios, and structural descriptors.
+
+### 5. Run experiment scripts
+
+```bash
+# Calibrated 3-class model
+python src/retrain_calibrated.py
+
+# Domain-robust model (local features only)
+python src/retrain_domain_robust.py
+
+# Hybrid 2-stage approach
+python src/retrain_hybrid.py
+
+# Fast 3-class training with MRO
+python src/train_3class_fast.py
+
+# Full pipeline with diagnostics
+python src/run_full_pipeline.py
+
+# Final solution with spatial kernel smoothing
+python src/run_final_solution.py
+python src/apply_spatial_kernel_smoothing.py
+
+# Diagnostics and validation
+python src/diagnose_polyamorphous.py
+python src/final_validation_mro2.py
+python src/generate_all_thresholds.py
+```
 
 ---
 
